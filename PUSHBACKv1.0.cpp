@@ -189,7 +189,28 @@ void opcontrol() {
 
         chassis.arcade(leftY, leftX);
 
-        
+        // CURVATURE DRIVE (optional)
+        // chassis.curvature(leftY, leftX, false);
+        // - leftY: forward/backward input (-127 to 127)
+        // - leftX: turn input (-127 to 127)
+        // - third parameter: allowQuickTurn (true = robot can spin in place when forward input is near 0)
+        // Example with quick turn enabled:
+        // chassis.curvature(leftY, leftX, true);
+		
+		/*
+        // Curvature drive explanation:
+        // chassis.curvature(forward, turn);
+        // - forward: controls the robot's speed forward/backward
+        // - turn: controls turning
+        // Difference from arcade drive:
+        //   - Curvature drive scales turning based on forward speed.
+        //     At high speed, turning is smoother and less twitchy.
+        //     At low speed, turning is sharper for tight maneuvers.
+        //   - Arcade drive (what we're currently using) mixes forward and turn linearly:
+        //     leftPower  = forward + turn
+        //     rightPower = forward - turn
+        //   - Curvature drive is preferred for "car-like" feel and smoother high-speed driving.
+        */
 
         
         // INTAKE CONTROL Joystick + Buttons
@@ -248,6 +269,3 @@ void opcontrol() {
         pros::delay(10);
     }
 }
-
-        
-    
