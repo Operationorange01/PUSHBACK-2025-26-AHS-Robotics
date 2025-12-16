@@ -1,4 +1,3 @@
-//THIS IS A CHANGE
 #include "main.h"
 #include <cmath>
 #include "lemlib/api.hpp" // IWYU pragma: keep
@@ -132,7 +131,286 @@ void competition_initialize() {}
 
 // get paths for pure pursuit
 // this needs to be put outside a function
-ASSET(example_txt); // '.' replaced with "_" to make c++ happy
+// all of the paths needed for the autons should be defined here
+ASSET(path11_txt); // '.' replaced with "_" to make c++ happy
+ASSET(path12_txt);
+ASSET(path13_txt);
+ASSET(path21_txt)
+ASSET(path22_txt);
+ASSET(path23_txt);
+ASSET(path31_txt);
+ASSET(path32_txt);
+ASSET(path33_txt);
+ASSET(path34_txt);
+ASSET(path41_txt);
+ASSET(path42_txt);
+ASSET(path43_txt);
+ASSET(path44_txt);
+
+// all of the functions for the autons
+
+// needed when teammate has a bad auton and picks the left side
+void leftCarryAuton(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Running Left Carry Auton");
+    //insert code here
+}
+
+// needed when teammate has a bad auton and picks the right side
+void rightCarryAuton(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Running Right Carry Auton");
+    //insert code here
+}
+
+// auton that starts on the left side
+void leftAuton(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Running Left Auton");
+    //insert code here
+}
+
+// auton that starts on the right side
+void rightAuton(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Running Right Auton");
+    //insert code here
+}
+
+// auton that starts on the left and goes to the middle before continuing
+void leftMiddleAuton(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Running Left Middle Auton");
+    //insert code here
+}
+
+// auton that starts on the right and goes to the middle before continuing
+void rightMiddleAuton(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Running Right Middle Auton");
+    //insert code here
+}
+
+// skills auton
+void skillsAuton(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Running Skills Auton");
+    //insert code here
+}
+
+// checks if it is a skills match or a normal match and runs the correct auton
+bool isTouching(int rectX, int rectY, int rectWidth, int rectHeight, int touchX, int touchY){
+    return touchX >= rectX && touchX <= (rectX + rectWidth) && 
+            touchY >= rectY && touchY <= (rectY + rectHeight);
+}
+
+// checks if it is a skills match or a normal match and runs the correct auton
+void isSkills(){
+    pros::lcd::clear();
+
+    //  define button positions and sizes
+    int skillsX = 40, skillsY = 50, skillsWidth = 180,skillsHeight = 100;
+    int noSkillsX = 220, noSkillsY = 50, noSkillsWidth = 180, noSkillsHeight = 100;
+
+    // skills button
+    pros::lcd::draw_rectangle(skillsX, skillsY, skillsWidth, skillsHeight);
+    pros::lcd::print_at(skillsX + 10, skillsY + 10, "Skills");
+
+    // no skills button
+    pros::lcd::draw_rectangle(noSkillsX, noSkillsY, noSkillsWidth, noSkillsHeight);
+    pros::lcd::print_at(noSkillsX + 10, noSkillsY + 10, "No Skills");
+    
+    // check if the button is pressed and which one
+    while(true){
+        //  get touch point
+        if(pros::lcd::is_touching()){
+            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
+            int x = touch.x;
+            int y = touch.y;
+
+            // check if the skills button is pressed
+            if(isTouching(skillsX, skillsY, skillsWidth, skillsHeight, x, y)){
+                // run skills auton
+                skillsAuton();
+                break;
+            }
+            // check if the no skills button is pressed
+            else if(isTouching(noSkillsX, noSkillsY, noSkillsWidth, noSkillsHeight, x, y)){
+                // run isCarry to determine if the auton needs to carry the teammate or not
+                isCarry()
+                break;
+            }
+        }
+    }
+}
+
+// checks if the auton needs to carry the teammate's bot or not
+void isCarry(){
+    pros::lcd::clear();
+
+    //  define button positions and sizes
+    int carryX = 40, carryY = 50, carryWidth = 180, carryHeight = 100;
+    int noCarryX = 220, noCarryY = 50, noCarryWidth = 180, noCarryHeight = 100;
+    int resetX = 130, resetY = 200, resetWidth = 180, resetHeight = 100;
+
+    // carry button
+    pros::lcd::draw_rectangle(carryX, carryY, carryWidth, carryHeight);
+    pros::lcd::print_at(carryX + 10, carryY + 10, "Carry");
+
+    // no carry button
+    pros::lcd::draw_rectangle(noCarryX, noCarryY, noCarryWidth, noCarryHeight);
+    pros::lcd::print_at(noCarryX + 10, noCarryY + 10, "No Carry");
+
+    // no skills button
+    pros::lcd::draw_rectangle(resetX, resetY, resetWidth, resetHeight);
+    pros::lcd::print_at(resetX + 10, resetY + 10, "Reset");
+
+    // check if the button is pressed and which one
+    while(true){
+        //  get touch point
+        if(pros::lcd::is_touching()){
+            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
+            int x = touch.x;
+            int y = touch.y;
+
+            // check if the carry button is pressed
+            if(isTouching(carryX, carryY, carryWidth, carryHeight, x, y)){
+                skillsAuton();
+                break;
+            }
+            // check if the no carry button is pressed
+            else if(isTouching(noCarryX, noCarryY, noCarryWidth, noCarryHeight, x, y)){
+                // run whichCarry to determine which side to start on
+                whichCarry();
+                break;
+            } else if(isTouching(resetX, resetY, resetWidth, resetHeight, x, y)){
+                // go back to isSkills
+                reset();
+                break;
+            }
+        }
+    }
+}
+
+// checks which side to start on for normal auton and whether to go to the middle or not
+void whichAuton(){
+    pros::lcd::clear();
+
+    //  define button positions and sizes
+    int topLeftX = 40, topLeftY = 20, topLeftWidth = 180, topLeftHeight = 100;
+    int topRightX = 220, topRightY = 20, topRightWidth = 180, topRightHeight = 100;
+    int bottomLeftX = 40, bottomLeftY = 150, bottomLeftWidth = 180, bottomLeftHeight = 100;
+    int bottomRightX = 220, bottomRightY = 150, bottomRightWidth = 180, bottomRightHeight = 100;
+    int resetX = 200, resetY = 168, resetWidth = 180, resetHeight = 100;
+
+    // carry button
+    pros::lcd::draw_rectangle(topLeftX, topLeftY, topLeftWidth, topLeftHeight);
+    pros::lcd::print_at(topLeftX + 10, topLeftY + 10, "Left");
+
+    // no carry button
+    pros::lcd::draw_rectangle(topRightX, topRightY, topRightWidth, topRightHeight);
+    pros::lcd::print_at(topRightX + 10, topRightY + 10, "Right");
+
+    // no skills button
+    pros::lcd::draw_rectangle(bottomLeftX, bottomLeftY, bottomLeftWidth, bottomLeftHeight);
+    pros::lcd::print_at(bottomLeftX + 10, bottomLeftY + 10, "Left Middle");
+
+    // no skills button
+    pros::lcd::draw_rectangle(bottomRightX, bottomRightY, bottomRightWidth, bottomRightHeight);
+    pros::lcd::print_at(bottomRightX + 10, bottomRightY + 10, "Right Middle");
+    // no skills button
+    pros::lcd::draw_rectangle(resetX, resetY, resetWidth, resetHeight);
+    pros::lcd::print_at(resetX + 10, resetY + 10, "Reset");
+
+    // check if the button is pressed and which one
+    while(true){
+        //  get touch point
+        if(pros::lcd::is_touching()){
+            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
+            int x = touch.x;
+            int y = touch.y;
+
+            // check if the left button is pressed
+            if(isTouching(topLeftX, topLeftY, topLeftWidth, topLeftHeight, x, y)){
+                leftAuton();
+                break;
+            // check if the right button is pressed
+            } else if(isTouching(topRightX, topRightY, topRightWidth, topRightHeight, x, y)){
+                rightAuton();
+                break;
+            // check if the left middle button is pressed
+            } else if(isTouching(bottomLeftX, bottomLeftY, bottomLeftWidth, bottomLeftHeight, x, y)){
+                leftMiddleAuton();
+                break;
+            //check if the right middle button is pressed
+            } else if(isTouching(bottomRightX, bottomRightY, bottomRightWidth, bottomRightHeight, x, y)){
+                rightMiddleAuton();
+                break;
+            // check if the reset button is pressed
+            } else if(isTouching(resetX, resetY, resetWidth, resetHeight, x, y)){
+                // go back to isSkills
+                reset();
+                break;
+            }
+        }
+    }
+}
+
+// checks which side to start on for the carry auton
+void whichCarry(){
+    pros::lcd::clear();
+
+    //  define button positions and sizes
+    int leftCarryX = 40, leftCarryY = 50, leftCarryWidth = 180, leftCarryHeight = 100;
+    int rightCarryX = 220, rightCarryY = 50, rightCarryWidth = 180, rightCarryHeight = 100;
+    int resetX = 130, resetY = 200, resetWidth = 180, resetHeight = 100;
+
+    // carry button
+    pros::lcd::draw_rectangle(leftCarryX, leftCarryY, leftCarryWidth, leftCarryHeight);
+    pros::lcd::print_at(leftCarryX + 10, leftCarryY + 10, "Left Carry");
+
+    // no carry button
+    pros::lcd::draw_rectangle(rightCarryX, rightCarryY, rightCarryWidth, rightCarryHeight);
+    pros::lcd::print_at(rightCarryX + 10, rightCarryY + 10, "Right Carry");
+
+    // no skills button
+    pros::lcd::draw_rectangle(resetX, resetY, resetWidth, resetHeight);
+    pros::lcd::print_at(resetX + 10, resetY + 10, "Reset");
+
+    // check if the button is pressed and which one
+    while(true){
+        //  get touch point
+        if(pros::lcd::is_touching()){
+            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
+            int x = touch.x;
+            int y = touch.y;
+
+            // check if the left carry button is pressed
+            if(isTouching(leftCarryX, leftCarryY, leftCarryWidth, leftCarryHeight, x, y)){
+                leftCarryAuton();
+                break;
+            }
+            // check if the right carry button is pressed
+            else if(isTouching(rightCarryX, rightCarryY, rightCarryWidth, rightCarryHeight, x, y)){
+                rightCarryAuton();
+                break;
+            }
+            // check if the reset button is pressed
+            else if(isTouching(resetX, resetY, resetWidth, resetHeight, x, y)){
+                // go back to isSkills
+                reset();
+                break;
+            }
+        }
+    }
+}
+
+// resets to the initial auton choice screen
+void reset(){
+    pros::lcd::clear();
+    pros::lcd::print(0, "Resetting choices...");
+    isSkills();
+}
 
 /**
  * Runs during auto
@@ -140,6 +418,8 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * This is an example autonomous routine which demonstrates a lot of the features LemLib has to offer
  */
 void autonomous() {
+    isSkills();
+    
 	/*
     // Move to x: 20 and y: 15, and face heading 90. Timeout set to 4000 ms
     chassis.moveToPose(20, 15, 90, 4000);
