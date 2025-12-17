@@ -1,6 +1,14 @@
-#include "main.h"
+#include "main.h" 
 #include <cmath>
+#include <string> 
+#include <vector>
 #include "lemlib/api.hpp" // IWYU pragma: keep
+
+#ifdef __cplusplus
+typedef int lcd_buttons_t; 
+#else 
+typedef int pros::lcd_buttons_t; 
+#endif
 
 // controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
@@ -87,39 +95,6 @@ lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
 
 /**
- * Runs initialization code. This occurs as soon as the program is started.
- *
- * All other competition modes are blocked by initialize; it is recommended
- * to keep execution time for this mode under a few seconds.
- */
-void initialize() {
-    pros::lcd::initialize(); // initialize brain screen
-    chassis.calibrate(); // calibrate sensors
-
-    // the default rate is 50. however, if you need to change the rate, you
-    // can do the following.
-    // lemlib::bufferedStdout().setRate(...);
-    // If you use bluetooth or a wired connection, you will want to have a rate of 10ms
-
-    // for more information on how the formatting for the loggers
-    // works, refer to the fmtlib docs
-
-    // thread to for brain screen and position logging
-    pros::Task screenTask([&]() {
-        while (true) {
-            // print robot location to the brain screen
-            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-            // log position telemetry
-            lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
-            // delay to save resources
-            pros::delay(50);
-        }
-    });
-}
-
-/**
  * Runs while the robot is disabled
  */
 void disabled() {}
@@ -146,6 +121,13 @@ ASSET(path41_txt);
 ASSET(path42_txt);
 ASSET(path43_txt);
 ASSET(path44_txt);
+
+// function declarations
+void isSkills();
+void isCarry();
+void whichAuton();
+void whichCarry();
+void reset();
 
 // all of the functions for the autons
 
@@ -198,217 +180,186 @@ void skillsAuton(){
     //insert code here
 }
 
-// checks if it is a skills match or a normal match and runs the correct auton
-bool isTouching(int rectX, int rectY, int rectWidth, int rectHeight, int touchX, int touchY){
-    return touchX >= rectX && touchX <= (rectX + rectWidth) && 
-            touchY >= rectY && touchY <= (rectY + rectHeight);
+const std::vector<std::string> skillsOptions = {"Skills Auton", "Competition Auton"};
+const std::vector<std::string> carryOptions = {"Carry Teammate", "Solo Auton", "Back"};
+const std::vector<std::string> whichCarryOptions = {"Left Carry", "Right Carry", "Back"};
+const std::vector<std::string> whichAutonOptions = {"Left Side", "Right Side", "Left Middle", "Right Middle", "Back"};
+
+// gets buttons pressed
+int getButtons() {
+    
+    // read the currently pressed buttons
+    int pressedButtons = pros::lcd::read_buttons();
+    
+    if (pressedButtons != 0) {
+        // wait until buttons are released
+        while (pros::lcd::read_buttons() != 0) {
+            pros::delay(10);
+        }
+    }
+    return pressedButtons;
+}
+
+// draw the menu and handle selection
+void drawMenu(const std::string& title, const std::vector<std::string>& options, int currentSelection) {
+    pros::lcd::clear();
+    // print the title
+    pros::lcd::set_text(0, title);
+    
+    // number of options
+    int numOptions = options.size(); 
+
+    for (int i = 0; i < numOptions; i++) {
+        // build display string
+        std::string displayText;
+        
+        // cool selection indicator
+        if (i == currentSelection) {
+            displayText = ">> " + options[i] + " <<";
+        } else {
+            displayText = "   " + options[i] + "   ";
+        }
+        
+        // print the string on line i + 1
+        pros::lcd::print(i + 1, displayText.c_str());
+    }
 }
 
 // checks if it is a skills match or a normal match and runs the correct auton
 void isSkills(){
-    pros::lcd::clear();
+    int selection = 0;
+    int numOptions = skillsOptions.size(); 
 
-    //  define button positions and sizes
-    int skillsX = 40, skillsY = 50, skillsWidth = 180,skillsHeight = 100;
-    int noSkillsX = 220, noSkillsY = 50, noSkillsWidth = 180, noSkillsHeight = 100;
-
-    // skills button
-    pros::lcd::draw_rectangle(skillsX, skillsY, skillsWidth, skillsHeight);
-    pros::lcd::print_at(skillsX + 10, skillsY + 10, "Skills");
-
-    // no skills button
-    pros::lcd::draw_rectangle(noSkillsX, noSkillsY, noSkillsWidth, noSkillsHeight);
-    pros::lcd::print_at(noSkillsX + 10, noSkillsY + 10, "No Skills");
-    
-    // check if the button is pressed and which one
     while(true){
-        //  get touch point
-        if(pros::lcd::is_touching()){
-            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
-            int x = touch.x;
-            int y = touch.y;
-
-            // check if the skills button is pressed
-            if(isTouching(skillsX, skillsY, skillsWidth, skillsHeight, x, y)){
-                // run skills auton
+        drawMenu("Match Type", skillsOptions, selection);
+        
+        auto buttons = getButtons();
+        
+        // moves up the selection
+        if (buttons & LCD_BTN_LEFT) { 
+            selection = (selection - 1 + numOptions) % numOptions;
+        } 
+        // moves down the selection
+        else if (buttons & LCD_BTN_RIGHT) { 
+            selection = (selection + 1) % numOptions;
+        } 
+        // selects the selection
+        else if (buttons & LCD_BTN_CENTER) {
+            if (selection == 0) { // skills auton
                 skillsAuton();
                 break;
-            }
-            // check if the no skills button is pressed
-            else if(isTouching(noSkillsX, noSkillsY, noSkillsWidth, noSkillsHeight, x, y)){
-                // run isCarry to determine if the auton needs to carry the teammate or not
-                isCarry()
+            } else { // no skills)
+                isCarry();
                 break;
             }
         }
+        pros::delay(10);
     }
 }
 
 // checks if the auton needs to carry the teammate's bot or not
 void isCarry(){
-    pros::lcd::clear();
+    int selection = 0;
+    int numOptions = carryOptions.size(); 
 
-    //  define button positions and sizes
-    int carryX = 40, carryY = 50, carryWidth = 180, carryHeight = 100;
-    int noCarryX = 220, noCarryY = 50, noCarryWidth = 180, noCarryHeight = 100;
-    int resetX = 130, resetY = 200, resetWidth = 180, resetHeight = 100;
-
-    // carry button
-    pros::lcd::draw_rectangle(carryX, carryY, carryWidth, carryHeight);
-    pros::lcd::print_at(carryX + 10, carryY + 10, "Carry");
-
-    // no carry button
-    pros::lcd::draw_rectangle(noCarryX, noCarryY, noCarryWidth, noCarryHeight);
-    pros::lcd::print_at(noCarryX + 10, noCarryY + 10, "No Carry");
-
-    // no skills button
-    pros::lcd::draw_rectangle(resetX, resetY, resetWidth, resetHeight);
-    pros::lcd::print_at(resetX + 10, resetY + 10, "Reset");
-
-    // check if the button is pressed and which one
     while(true){
-        //  get touch point
-        if(pros::lcd::is_touching()){
-            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
-            int x = touch.x;
-            int y = touch.y;
+        drawMenu("Carry Status", carryOptions, selection);
 
-            // check if the carry button is pressed
-            if(isTouching(carryX, carryY, carryWidth, carryHeight, x, y)){
-                skillsAuton();
-                break;
-            }
-            // check if the no carry button is pressed
-            else if(isTouching(noCarryX, noCarryY, noCarryWidth, noCarryHeight, x, y)){
-                // run whichCarry to determine which side to start on
+        auto buttons = getButtons();
+
+        // moves up the selection
+        if (buttons & LCD_BTN_LEFT) { 
+            selection = (selection - 1 + numOptions) % numOptions;
+        } 
+        // moves down the selection
+        else if (buttons & LCD_BTN_RIGHT) { 
+            selection = (selection + 1) % numOptions;
+        } 
+        // selects the selection
+        else if (buttons & LCD_BTN_CENTER) {
+            if (selection == 0) { // Carry Teammate
                 whichCarry();
                 break;
-            } else if(isTouching(resetX, resetY, resetWidth, resetHeight, x, y)){
-                // go back to isSkills
-                reset();
+            } else if(selection == 1){ // Solo Auton (No Carry)
+                whichAuton();
                 break;
+            } else if(selection == 2){ // Back
+                isSkills();
+                return;
             }
         }
+        pros::delay(10);
     }
 }
 
 // checks which side to start on for normal auton and whether to go to the middle or not
 void whichAuton(){
-    pros::lcd::clear();
+    int selection = 0;
+    int numOptions = whichAutonOptions.size(); 
 
-    //  define button positions and sizes
-    int topLeftX = 40, topLeftY = 20, topLeftWidth = 180, topLeftHeight = 100;
-    int topRightX = 220, topRightY = 20, topRightWidth = 180, topRightHeight = 100;
-    int bottomLeftX = 40, bottomLeftY = 150, bottomLeftWidth = 180, bottomLeftHeight = 100;
-    int bottomRightX = 220, bottomRightY = 150, bottomRightWidth = 180, bottomRightHeight = 100;
-    int resetX = 200, resetY = 168, resetWidth = 180, resetHeight = 100;
-
-    // carry button
-    pros::lcd::draw_rectangle(topLeftX, topLeftY, topLeftWidth, topLeftHeight);
-    pros::lcd::print_at(topLeftX + 10, topLeftY + 10, "Left");
-
-    // no carry button
-    pros::lcd::draw_rectangle(topRightX, topRightY, topRightWidth, topRightHeight);
-    pros::lcd::print_at(topRightX + 10, topRightY + 10, "Right");
-
-    // no skills button
-    pros::lcd::draw_rectangle(bottomLeftX, bottomLeftY, bottomLeftWidth, bottomLeftHeight);
-    pros::lcd::print_at(bottomLeftX + 10, bottomLeftY + 10, "Left Middle");
-
-    // no skills button
-    pros::lcd::draw_rectangle(bottomRightX, bottomRightY, bottomRightWidth, bottomRightHeight);
-    pros::lcd::print_at(bottomRightX + 10, bottomRightY + 10, "Right Middle");
-    // no skills button
-    pros::lcd::draw_rectangle(resetX, resetY, resetWidth, resetHeight);
-    pros::lcd::print_at(resetX + 10, resetY + 10, "Reset");
-
-    // check if the button is pressed and which one
     while(true){
-        //  get touch point
-        if(pros::lcd::is_touching()){
-            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
-            int x = touch.x;
-            int y = touch.y;
+        drawMenu("Solo Auton", whichAutonOptions, selection);
 
-            // check if the left button is pressed
-            if(isTouching(topLeftX, topLeftY, topLeftWidth, topLeftHeight, x, y)){
-                leftAuton();
-                break;
-            // check if the right button is pressed
-            } else if(isTouching(topRightX, topRightY, topRightWidth, topRightHeight, x, y)){
-                rightAuton();
-                break;
-            // check if the left middle button is pressed
-            } else if(isTouching(bottomLeftX, bottomLeftY, bottomLeftWidth, bottomLeftHeight, x, y)){
-                leftMiddleAuton();
-                break;
-            //check if the right middle button is pressed
-            } else if(isTouching(bottomRightX, bottomRightY, bottomRightWidth, bottomRightHeight, x, y)){
-                rightMiddleAuton();
-                break;
-            // check if the reset button is pressed
-            } else if(isTouching(resetX, resetY, resetWidth, resetHeight, x, y)){
-                // go back to isSkills
-                reset();
-                break;
+        auto buttons = getButtons();
+        
+        // moves up the selection
+        if (buttons & LCD_BTN_LEFT) { 
+            selection = (selection - 1 + numOptions) % numOptions;
+        } 
+        // moves down the selection
+        else if (buttons & LCD_BTN_RIGHT) { 
+            selection = (selection + 1) % numOptions;
+        } 
+        // selects the selection
+        else if (buttons & LCD_BTN_CENTER) {
+            switch(selection) {
+                case 0: leftAuton(); break;
+                case 1: rightAuton(); break;
+                case 2: leftMiddleAuton(); break;
+                case 3: rightMiddleAuton(); break;
+                case 4: isCarry(); return; // Back
             }
+            if (selection != 4) break;
         }
+        pros::delay(10);
     }
 }
 
 // checks which side to start on for the carry auton
 void whichCarry(){
-    pros::lcd::clear();
+    int selection = 0;
+    int numOptions = whichCarryOptions.size(); 
 
-    //  define button positions and sizes
-    int leftCarryX = 40, leftCarryY = 50, leftCarryWidth = 180, leftCarryHeight = 100;
-    int rightCarryX = 220, rightCarryY = 50, rightCarryWidth = 180, rightCarryHeight = 100;
-    int resetX = 130, resetY = 200, resetWidth = 180, resetHeight = 100;
-
-    // carry button
-    pros::lcd::draw_rectangle(leftCarryX, leftCarryY, leftCarryWidth, leftCarryHeight);
-    pros::lcd::print_at(leftCarryX + 10, leftCarryY + 10, "Left Carry");
-
-    // no carry button
-    pros::lcd::draw_rectangle(rightCarryX, rightCarryY, rightCarryWidth, rightCarryHeight);
-    pros::lcd::print_at(rightCarryX + 10, rightCarryY + 10, "Right Carry");
-
-    // no skills button
-    pros::lcd::draw_rectangle(resetX, resetY, resetWidth, resetHeight);
-    pros::lcd::print_at(resetX + 10, resetY + 10, "Reset");
-
-    // check if the button is pressed and which one
     while(true){
-        //  get touch point
-        if(pros::lcd::is_touching()){
-            pros::lcd::touch_point_t touch = pros::lcd::get_touch_point();
-            int x = touch.x;
-            int y = touch.y;
+        drawMenu("Carry Auton", whichCarryOptions, selection);
 
-            // check if the left carry button is pressed
-            if(isTouching(leftCarryX, leftCarryY, leftCarryWidth, leftCarryHeight, x, y)){
-                leftCarryAuton();
-                break;
+        auto buttons = getButtons();
+        
+        // moves up the selection
+        if (buttons & LCD_BTN_LEFT) { 
+            selection = (selection - 1 + numOptions) % numOptions;
+        } 
+        // moves down the selection
+        else if (buttons & LCD_BTN_RIGHT) { 
+            selection = (selection + 1) % numOptions;
+        } 
+        // selects the selection
+        else if (buttons & LCD_BTN_CENTER) {
+            switch(selection) {
+                case 0: leftCarryAuton(); break;
+                case 1: rightCarryAuton(); break;
+                case 2: isCarry(); return; // Back
             }
-            // check if the right carry button is pressed
-            else if(isTouching(rightCarryX, rightCarryY, rightCarryWidth, rightCarryHeight, x, y)){
-                rightCarryAuton();
-                break;
-            }
-            // check if the reset button is pressed
-            else if(isTouching(resetX, resetY, resetWidth, resetHeight, x, y)){
-                // go back to isSkills
-                reset();
-                break;
-            }
+            if (selection != 2) break;
         }
+        pros::delay(10);
     }
 }
 
-// resets to the initial auton choice screen
+// resets to the first auton choice screen (i didn't use this function and idk if it works, but wtv)
 void reset(){
     pros::lcd::clear();
-    pros::lcd::print(0, "Resetting choices...");
+    pros::lcd::print(0, "Resetting choices");
     isSkills();
 }
 
@@ -453,11 +404,49 @@ void autonomous() {
  * Runs in driver control
  */
 
+/**
+ * Runs initialization code. This occurs as soon as the program is started.
+ *
+ * All other competition modes are blocked by initialize; it is recommended
+ * to keep execution time for this mode under a few seconds.
+ */
+void initialize() {
+    pros::lcd::initialize(); // initialize brain screen
+    chassis.calibrate(); // calibrate sensors
+
+    isSkills(); // start auton selection menu, it is temporarily here for testing. it should be only in autonomous() during the competition.
+
+    // the default rate is 50. however, if you need to change the rate, you
+    // can do the following.
+    // lemlib::bufferedStdout().setRate(...);
+    // If you use bluetooth or a wired connection, you will want to have a rate of 10ms
+
+    // for more information on how the formatting for the loggers
+    // works, refer to the fmtlib docs
+
+    // thread to for brain screen and position logging
+    
+    pros::Task screenTask([&]() {
+        while (true) {
+            // print robot location to the brain screen
+            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+            // log position telemetry
+            lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
+            // delay to save resources
+            pros::delay(50);
+        }
+    });
+}
+
+// exponential function for intake joystick
 double expo(int input, double k) {
     double x = input / 127.0;
     return (k * x * x * x + (1.0 - k) * x) * 127.0;
 }
- 
+
+// runs during operator control 
 void opcontrol() {
     // controller
     // loop to continuously update motors
