@@ -41,9 +41,9 @@ lemlib::Drivetrain drivetrain(&leftMotors, // left motor group
 );
 
 // lateral motion controller
-lemlib::ControllerSettings linearController(10, // proportional gain (kP)
-                                            0, // integral gain (kI)
-                                            3, // derivative gain (kD)
+lemlib::ControllerSettings linearController(10, // proportional gain (kP) -- how hard it drives
+                                            0, // integral gain (kI) -- ignore for now
+                                            3, // derivative gain (kD) -- how fast it stops
                                             3, // anti windup
                                             1, // small error range, in inches
                                             100, // small error range timeout, in milliseconds
@@ -53,9 +53,9 @@ lemlib::ControllerSettings linearController(10, // proportional gain (kP)
 );
 
 // angular motion controller
-lemlib::ControllerSettings angularController(2, // proportional gain (kP)
-                                             0, // integral gain (kI)
-                                             10, // derivative gain (kD)
+lemlib::ControllerSettings angularController(2, // proportional gain (kP) -- how hard it turns
+                                             0, // integral gain (kI) -- ignore for now
+                                             10, // derivative gain (kD) -- how fast it stops
                                              3, // anti windup
                                              1, // small error range, in degrees
                                              100, // small error range timeout, in milliseconds
@@ -81,7 +81,7 @@ lemlib::ExpoDriveCurve throttleCurve(3, //joystick deadband out of 127.
 // input curve for steer input during driver control
 lemlib::ExpoDriveCurve steerCurve(8, //the deadband now is 8. any movement lower than 8 will be ignored.
                                   10, // minimum output where drivetrain will move out of 127
-                                  1.019 // expo curve gain
+                                  1.01 // expo curve gain
 );
 
 // create the chassis
@@ -96,8 +96,14 @@ constexpr int NUM_AUTONS = 3; // total number of autonomous routines
 
 // define our three basic autonomous routines
 void autonLeft() {
-    // left side routine, just a sample move
-    chassis.moveToPose(24, 0, 0, 3000); // move forward 24 inches
+    //Path 1.1
+    chassis.follow(path11_txt, 15, 3000, true);
+    chassis.waitUntilDone(); // wait for path to finish
+
+    //do intake/outtake action here
+    outtakePiston.set_value(true);
+    pros::delay(1000); // wait for a second
+    outtakePiston.set_value(false); // close piston again
 }
 
 void autonRight() {
@@ -120,7 +126,7 @@ void selectAutonMenu() {
     bool longPress = false;
     while (!longPress) {
         uint32_t buttons = pros::lcd::read_buttons();
-        if (buttons & PROS_LCD_BTN_CENTER) {
+        if (buttons & LCD_BTN_CENTER) {
             pros::delay(500); // hold for half a second to confirm
             longPress = true;
         } else {
@@ -185,7 +191,9 @@ void competition_initialize() {}
 
 // get paths for pure pursuit
 // this needs to be put outside a function
-ASSET(example_txt); // '.' replaced with "_" to make c++ happy
+ASSET(path12_txt); // '.' replaced with "_" to make c++ happy
+ASSET(path11_txt);
+ASSET(path13_txt);
 
 /**
  * Runs during auto
@@ -193,51 +201,29 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * This is an example autonomous routine which demonstrates a lot of the features LemLib has to offer
  */
 void autonomous() {
-    // run the auton we picked in the menu
-    switch (selectedAuton) {
-        case 0: autonLeft(); break;
-        case 1: autonRight(); break;
-        case 2: autonMiddle(); break;
-    }
 
-	/*
-    // Move to x: 20 and y: 15, and face heading 90. Timeout set to 4000 ms
-    chassis.moveToPose(20, 15, 90, 4000);
-    // Move to x: 0 and y: 0 and face heading 270, going backwards. Timeout set to 4000ms
-    chassis.moveToPose(0, 0, 270, 4000, {.forwards = false});
-    // cancel the movement after it has traveled 10 inches
-    chassis.waitUntil(10);
-    chassis.cancelMotion();
-    // Turn to face the point x:45, y:-45. Timeout set to 1000
-    // dont turn faster than 60 (out of a maximum of 127)
-    chassis.turnToPoint(45, -45, 1000, {.maxSpeed = 60});
-    // Turn to face a direction of 90º. Timeout set to 1000
-    // will always be faster than 100 (out of a maximum of 127)
-    // also force it to turn clockwise, the long way around
-    chassis.turnToHeading(90, 1000, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
-    // Follow the path in path.txt. Lookahead at 15, Timeout set to 4000
-    // following the path with the back of the robot (forwards = false)
-    // see line 116 to see how to define a path
-    chassis.follow(example_txt, 15, 4000, false);
-    // wait until the chassis has traveled 10 inches. Otherwise the code directly after
-    // the movement will run immediately
-    // Unless its another movement, in which case it will wait
-    chassis.waitUntil(10);
-    pros::lcd::print(4, "Traveled 10 inches during pure pursuit!");
-    // wait until the movement is done
+    // ---- TEMP PID TEST ----
+    // move forward 24 inches
+    chassis.moveToPose(24, 0, 0, 3000);
     chassis.waitUntilDone();
-    pros::lcd::print(4, "pure pursuit finished!");*/
+    pros::delay(1000); // pause
+
+    // move back to start
+    chassis.moveToPose(0, 0, 0, 3000);
+    chassis.waitUntilDone();
+    pros::delay(1000);
+    // ---- END TEMP PID TEST ----
 }
 
-/**
- * Runs in driver control
- */
+// ==============================
+// DRIVER CONTROL FUNCTIONS
+// ==============================
 
 double expo(int input, double k) {
     double x = input / 127.0;
     return (k * x * x * x + (1.0 - k) * x) * 127.0;
 }
- 
+
 void opcontrol() {
     // controller
     // loop to continuously update motors
@@ -302,7 +288,6 @@ void opcontrol() {
                 n4.move_velocity(0);
             }
         }
-
 
         // WING CONTROL (PNEUMATICS)
         // Hold L1 = wing deploys (down)
