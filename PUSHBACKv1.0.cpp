@@ -6,26 +6,26 @@
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 // motor groups
-pros::MotorGroup leftMotors({-5, 4, -3}, pros::MotorGearset::blue); // left motor group - ports 3 (reversed), 4, 5 (reversed)
-pros::MotorGroup rightMotors({6, -9, 7}, pros::MotorGearset::blue); // right motor group - ports 6, 7, 9 (reversed)
+pros::MotorGroup leftMotors({-1, -11, -2}, pros::MotorGearset::blue); // left motor group - ports 3 (reversed), 4, 5 (reversed)
+pros::MotorGroup rightMotors({12, 3, 13}, pros::MotorGearset::blue); // right motor group - ports 6, 7, 9 (reversed)
 
 // intake/outtake motors
-pros::Motor n1(-1, pros::MotorGearset::green);
-pros::Motor n2(2, pros::MotorGearset::green);
-pros::Motor n3(9, pros::MotorGearset::green);
-pros::Motor n4(-10, pros::MotorGearset::green);
+pros::Motor n1(4, pros::MotorGearset::green);
+pros::Motor n2(5, pros::MotorGearset::green);
+pros::Motor n3(-9, pros::MotorGearset::green);
+pros::Motor n4(7, pros::MotorGearset::green);
 
 pros::ADIDigitalOut outtakePiston('B');
 pros::ADIDigitalOut wingPiston('A'); // wing piston ADI port
 
 // Inertial Sensor on port 10
-pros::Imu imu(10);
+pros::Imu imu(19);
 
 // tracking wheels
 // horizontal tracking wheel encoder. Rotation sensor, port 20, not reversed
-pros::Rotation horizontalEnc(20);
+pros::Rotation horizontalEnc(10);
 // vertical tracking wheel encoder. Rotation sensor, port 11, reversed
-pros::Rotation verticalEnc(-11);
+pros::Rotation verticalEnc(20);
 // horizontal tracking wheel. 2.75" diameter, 5.75" offset, back of the robot (negative)
 lemlib::TrackingWheel horizontal(&horizontalEnc, lemlib::Omniwheel::NEW_275, -5.75);
 // vertical tracking wheel. 2.75" diameter, 2.5" offset, left of the robot (negative)
@@ -79,9 +79,9 @@ lemlib::ExpoDriveCurve throttleCurve(3, //joystick deadband out of 127.
 );
 
 // input curve for steer input during driver control
-lemlib::ExpoDriveCurve steerCurve(8, //the deadband now is 8. any movement lower than 8 will be ignored.
+lemlib::ExpoDriveCurve steerCurve(3, //the deadband now is 6. any movement lower than 6 will be ignored.
                                   10, // minimum output where drivetrain will move out of 127
-                                  1.01 // expo curve gain
+                                  5 // expo curve gain
 );
 
 // create the chassis
@@ -96,8 +96,7 @@ constexpr int NUM_AUTONS = 3; // total number of autonomous routines
 
 // define our three basic autonomous routines
 void autonLeft() {
-    //Path 1.1
-    chassis.follow(path11_txt, 15, 3000, true);
+    // chassis.follow(path11_txt, 15, 3000, true);
     chassis.waitUntilDone(); // wait for path to finish
 
     //do intake/outtake action here
@@ -120,7 +119,8 @@ void autonMiddle() {
 void selectAutonMenu() {
     pros::lcd::initialize();
     pros::lcd::set_text(1, "Select Autonomous:");
-    pros::lcd::set_text(4, "CENTER = confirm");
+    pros::lcd::set_text(4, "CENTER = confirm");//Path 1.1
+   
     pros::lcd::set_text(2, autonNames[selectedAuton]);
 
     bool longPress = false;
@@ -225,78 +225,73 @@ double expo(int input, double k) {
 }
 
 void opcontrol() {
-    // controller
-    // loop to continuously update motors
     while (true) {
-        // get joystick positions for driving
+        // ==============================
+        // DRIVE CONTROL
+        // ==============================
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
-        // move the chassis with curvature drive
         chassis.arcade(leftY, leftX);
 
         // ==============================
-        // INTAKE CONTROL (Joystick + Buttons)
+        // INTAKE CONTROL (Buttons + Joystick)
         // ==============================
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
         bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
 
-        // Deadzone for intake joystick
         constexpr int INTAKEJOY_DEADZONE = 15;
-
-        // Exponential factor for intake joystick
         constexpr double INTAKE_EXPO_K = 0.6;
+        constexpr int MAX_INTAKE_RPM = 200;
 
-        // DEADZONE
-        if (abs(rightY) < INTAKEJOY_DEADZONE) {
+        // BUTTONS HAVE PRIORITY
+        if (r1) {
+            // Top outtake
+            outtakePiston.set_value(false);
+
+            n1.move_velocity(200);
+            n2.move_velocity(200);
+            n3.move_velocity(200);
+            n4.move_velocity(200);
+        }
+        else if (r2) {
+            // Middle outtake
+            outtakePiston.set_value(true);
+
+            n1.move_velocity(200);
+            n2.move_velocity(200);
+            n3.move_velocity(200);
+            n4.move_velocity(0);
+        }
+        else if (abs(rightY) > INTAKEJOY_DEADZONE) {
+            // Joystick intake
+            int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
+            int speedRPM = (speed * MAX_INTAKE_RPM) / 127;
+
+            outtakePiston.set_value(false);
+
+            n1.move_velocity(speedRPM);
+            n2.move_velocity(speedRPM);
+            n3.move_velocity(speedRPM);
+            n4.move_velocity(0);
+        }
+        else {
+            // Stop everything
+            outtakePiston.set_value(false);
+
             n1.move_velocity(0);
             n2.move_velocity(0);
             n3.move_velocity(0);
             n4.move_velocity(0);
-            outtakePiston.set_value(false);
-        } 
-        else {
-            int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
-
-            // R2 → middle outtake
-            if (r2) {
-                outtakePiston.set_value(true);
-                int upSpeed = abs(speed);
-
-                n1.move_velocity(upSpeed);
-                n2.move_velocity(upSpeed);
-                n3.move_velocity(upSpeed);
-                n4.move_velocity(0);
-            }
-            // R1 → top outtake
-            else if (r1) {
-                outtakePiston.set_value(false);
-                int upSpeed = abs(speed);
-
-                n1.move_velocity(upSpeed);
-                n2.move_velocity(upSpeed);
-                n3.move_velocity(upSpeed);
-                n4.move_velocity(upSpeed);
-            }
-            // Normal intake/outtake
-            else {
-                outtakePiston.set_value(false);
-
-                n1.move_velocity(speed);
-                n2.move_velocity(speed);
-                n3.move_velocity(speed);
-                n4.move_velocity(0);
-            }
         }
 
-        // WING CONTROL (PNEUMATICS)
-        // Hold L1 = wing deploys (down)
-        // Release L1 = wing retracts (up)
+        // ==============================
+        // WING CONTROL
+        // ==============================
         wingPiston.set_value(
             controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)
         );
 
-        // small delay to prevent CPU overload
         pros::delay(10);
     }
 }
