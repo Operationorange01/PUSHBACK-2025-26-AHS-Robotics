@@ -15,7 +15,8 @@ pros::Motor n2(2, pros::MotorGearset::green);
 pros::Motor n3(9, pros::MotorGearset::green);
 pros::Motor n4(-10, pros::MotorGearset::green);
 
-pros::ADIDigitalOut outtakePiston('A');
+pros::ADIDigitalOut outtakePiston('B');
+pros::ADIDigitalOut wingPiston('A'); // wing piston ADI port
 
 // Inertial Sensor on port 10
 pros::Imu imu(10);
@@ -245,18 +246,19 @@ void opcontrol() {
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
         // move the chassis with curvature drive
-
         chassis.arcade(leftY, leftX);
 
-        // INTAKE CONTROL Joystick + Buttons
+        // ==============================
+        // INTAKE CONTROL (Joystick + Buttons)
+        // ==============================
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
         bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
 
-        //Deadzone for intake joystick
+        // Deadzone for intake joystick
         constexpr int INTAKEJOY_DEADZONE = 15;
 
-        //Exponential factor for intake joystick
+        // Exponential factor for intake joystick
         constexpr double INTAKE_EXPO_K = 0.6;
 
         // DEADZONE
@@ -301,6 +303,15 @@ void opcontrol() {
             }
         }
 
+
+        // WING CONTROL (PNEUMATICS)
+        // Hold L1 = wing deploys (down)
+        // Release L1 = wing retracts (up)
+        wingPiston.set_value(
+            controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)
+        );
+
+        // small delay to prevent CPU overload
         pros::delay(10);
     }
 }
