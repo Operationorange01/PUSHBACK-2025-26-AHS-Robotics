@@ -1,14 +1,6 @@
-#include "main.h" 
+#include "main.h"
 #include <cmath>
-#include <string> 
-#include <vector>
 #include "lemlib/api.hpp" // IWYU pragma: keep
-
-#ifdef __cplusplus
-typedef int lcd_buttons_t; 
-#else 
-typedef int pros::lcd_buttons_t; 
-#endif
 
 // controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
@@ -80,19 +72,105 @@ lemlib::OdomSensors sensors(&vertical, // vertical tracking wheel
 );
 
 // input curve for throttle input during driver control
-lemlib::ExpoDriveCurve throttleCurve(3, // joystick deadband out of 127
+lemlib::ExpoDriveCurve throttleCurve(3, //joystick deadband out of 127.
                                      10, // minimum output where drivetrain will move out of 127
                                      1.019 // expo curve gain
 );
 
 // input curve for steer input during driver control
-lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
+lemlib::ExpoDriveCurve steerCurve(8, //the deadband now is 8. any movement lower than 8 will be ignored.
                                   10, // minimum output where drivetrain will move out of 127
                                   1.019 // expo curve gain
 );
 
 // create the chassis
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
+
+//------------------------
+// OUR AUTONOMOUS MENU SETUP
+//------------------------
+int selectedAuton = 0; // we're gonna store which auton we pick here
+std::string autonNames[] = {"Left", "Right", "Middle"}; // names for each auton, so we can display them
+constexpr int NUM_AUTONS = 3; // total number of autonomous routines
+
+// define our three basic autonomous routines
+void autonLeft() {
+    // left side routine, just a sample move
+    chassis.moveToPose(24, 0, 0, 3000); // move forward 24 inches
+}
+
+void autonRight() {
+    // right side routine, another sample move
+    chassis.moveToPose(24, 24, 90, 3000); // move diagonally to right
+}
+
+void autonMiddle() {
+    // middle routine, kinda whatever we want
+    chassis.moveToPose(12, 12, 45, 3000);
+}
+
+// single-button menu for the brain
+void selectAutonMenu() {
+    pros::lcd::initialize();
+    pros::lcd::set_text(1, "Select Autonomous:");
+    pros::lcd::set_text(4, "CENTER = confirm");
+    pros::lcd::set_text(2, autonNames[selectedAuton]);
+
+    bool longPress = false;
+    while (!longPress) {
+        uint32_t buttons = pros::lcd::read_buttons();
+        if (buttons & PROS_LCD_BTN_CENTER) {
+            pros::delay(500); // hold for half a second to confirm
+            longPress = true;
+        } else {
+            selectedAuton++;
+            if (selectedAuton >= NUM_AUTONS) selectedAuton = 0;
+            pros::lcd::set_text(2, autonNames[selectedAuton]);
+            pros::delay(300); // scroll delay
+        }
+        pros::delay(20);
+    }
+}
+
+//------------------------
+// END AUTON MENU SETUP
+//------------------------
+
+/**
+ * Runs initialization code. This occurs as soon as the program is started.
+ *
+ * All other competition modes are blocked by initialize; it is recommended
+ * to keep execution time for this mode under a few seconds.
+ */
+void initialize() {
+    pros::lcd::initialize(); // initialize brain screen
+    chassis.calibrate(); // calibrate sensors
+
+    // the default rate is 50. however, if you need to change the rate, you
+    // can do the following.
+    // lemlib::bufferedStdout().setRate(...);
+    // If you use bluetooth or a wired connection, you will want to have a rate of 10ms
+
+    // for more information on how the formatting for the loggers
+    // works, refer to the fmtlib docs
+
+    // thread to for brain screen and position logging
+    pros::Task screenTask([&]() {
+        while (true) {
+            // print robot location to the brain screen
+            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+            // log position telemetry
+            lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
+            // delay to save resources
+            pros::delay(50);
+        }
+    });
+
+    // run our auton menu here, before match starts
+    selectAutonMenu(); // we pick our autonomous routine here
+}
 
 /**
  * Runs while the robot is disabled
@@ -106,262 +184,7 @@ void competition_initialize() {}
 
 // get paths for pure pursuit
 // this needs to be put outside a function
-// all of the paths needed for the autons should be defined here
-ASSET(path11_txt); // '.' replaced with "_" to make c++ happy
-ASSET(path12_txt);
-ASSET(path13_txt);
-ASSET(path21_txt)
-ASSET(path22_txt);
-ASSET(path23_txt);
-ASSET(path31_txt);
-ASSET(path32_txt);
-ASSET(path33_txt);
-ASSET(path34_txt);
-ASSET(path41_txt);
-ASSET(path42_txt);
-ASSET(path43_txt);
-ASSET(path44_txt);
-
-// function declarations
-void isSkills();
-void isCarry();
-void whichAuton();
-void whichCarry();
-void reset();
-
-// all of the functions for the autons
-
-// needed when teammate has a bad auton and picks the left side
-void leftCarryAuton(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Running Left Carry Auton");
-    //insert code here
-}
-
-// needed when teammate has a bad auton and picks the right side
-void rightCarryAuton(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Running Right Carry Auton");
-    //insert code here
-}
-
-// auton that starts on the left side
-void leftAuton(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Running Left Auton");
-    //insert code here
-}
-
-// auton that starts on the right side
-void rightAuton(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Running Right Auton");
-    //insert code here
-}
-
-// auton that starts on the left and goes to the middle before continuing
-void leftMiddleAuton(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Running Left Middle Auton");
-    //insert code here
-}
-
-// auton that starts on the right and goes to the middle before continuing
-void rightMiddleAuton(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Running Right Middle Auton");
-    //insert code here
-}
-
-// skills auton
-void skillsAuton(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Running Skills Auton");
-    //insert code here
-}
-
-const std::vector<std::string> skillsOptions = {"Skills Auton", "Competition Auton"};
-const std::vector<std::string> carryOptions = {"Carry Teammate", "Solo Auton", "Back"};
-const std::vector<std::string> whichCarryOptions = {"Left Carry", "Right Carry", "Back"};
-const std::vector<std::string> whichAutonOptions = {"Left Side", "Right Side", "Left Middle", "Right Middle", "Back"};
-
-// gets buttons pressed
-int getButtons() {
-    
-    // read the currently pressed buttons
-    int pressedButtons = pros::lcd::read_buttons();
-    
-    if (pressedButtons != 0) {
-        // wait until buttons are released
-        while (pros::lcd::read_buttons() != 0) {
-            pros::delay(10);
-        }
-    }
-    return pressedButtons;
-}
-
-// draw the menu and handle selection
-void drawMenu(const std::string& title, const std::vector<std::string>& options, int currentSelection) {
-    pros::lcd::clear();
-    // print the title
-    pros::lcd::set_text(0, title);
-    
-    // number of options
-    int numOptions = options.size(); 
-
-    for (int i = 0; i < numOptions; i++) {
-        // build display string
-        std::string displayText;
-        
-        // cool selection indicator
-        if (i == currentSelection) {
-            displayText = ">> " + options[i] + " <<";
-        } else {
-            displayText = "   " + options[i] + "   ";
-        }
-        
-        // print the string on line i + 1
-        pros::lcd::print(i + 1, displayText.c_str());
-    }
-}
-
-// checks if it is a skills match or a normal match and runs the correct auton
-void isSkills(){
-    int selection = 0;
-    int numOptions = skillsOptions.size(); 
-
-    while(true){
-        drawMenu("Match Type", skillsOptions, selection);
-        
-        auto buttons = getButtons();
-        
-        // moves up the selection
-        if (buttons & LCD_BTN_LEFT) { 
-            selection = (selection - 1 + numOptions) % numOptions;
-        } 
-        // moves down the selection
-        else if (buttons & LCD_BTN_RIGHT) { 
-            selection = (selection + 1) % numOptions;
-        } 
-        // selects the selection
-        else if (buttons & LCD_BTN_CENTER) {
-            if (selection == 0) { // skills auton
-                skillsAuton();
-                break;
-            } else { // no skills)
-                isCarry();
-                break;
-            }
-        }
-        pros::delay(10);
-    }
-}
-
-// checks if the auton needs to carry the teammate's bot or not
-void isCarry(){
-    int selection = 0;
-    int numOptions = carryOptions.size(); 
-
-    while(true){
-        drawMenu("Carry Status", carryOptions, selection);
-
-        auto buttons = getButtons();
-
-        // moves up the selection
-        if (buttons & LCD_BTN_LEFT) { 
-            selection = (selection - 1 + numOptions) % numOptions;
-        } 
-        // moves down the selection
-        else if (buttons & LCD_BTN_RIGHT) { 
-            selection = (selection + 1) % numOptions;
-        } 
-        // selects the selection
-        else if (buttons & LCD_BTN_CENTER) {
-            if (selection == 0) { // Carry Teammate
-                whichCarry();
-                break;
-            } else if(selection == 1){ // Solo Auton (No Carry)
-                whichAuton();
-                break;
-            } else if(selection == 2){ // Back
-                isSkills();
-                return;
-            }
-        }
-        pros::delay(10);
-    }
-}
-
-// checks which side to start on for normal auton and whether to go to the middle or not
-void whichAuton(){
-    int selection = 0;
-    int numOptions = whichAutonOptions.size(); 
-
-    while(true){
-        drawMenu("Solo Auton", whichAutonOptions, selection);
-
-        auto buttons = getButtons();
-        
-        // moves up the selection
-        if (buttons & LCD_BTN_LEFT) { 
-            selection = (selection - 1 + numOptions) % numOptions;
-        } 
-        // moves down the selection
-        else if (buttons & LCD_BTN_RIGHT) { 
-            selection = (selection + 1) % numOptions;
-        } 
-        // selects the selection
-        else if (buttons & LCD_BTN_CENTER) {
-            switch(selection) {
-                case 0: leftAuton(); break;
-                case 1: rightAuton(); break;
-                case 2: leftMiddleAuton(); break;
-                case 3: rightMiddleAuton(); break;
-                case 4: isCarry(); return; // Back
-            }
-            if (selection != 4) break;
-        }
-        pros::delay(10);
-    }
-}
-
-// checks which side to start on for the carry auton
-void whichCarry(){
-    int selection = 0;
-    int numOptions = whichCarryOptions.size(); 
-
-    while(true){
-        drawMenu("Carry Auton", whichCarryOptions, selection);
-
-        auto buttons = getButtons();
-        
-        // moves up the selection
-        if (buttons & LCD_BTN_LEFT) { 
-            selection = (selection - 1 + numOptions) % numOptions;
-        } 
-        // moves down the selection
-        else if (buttons & LCD_BTN_RIGHT) { 
-            selection = (selection + 1) % numOptions;
-        } 
-        // selects the selection
-        else if (buttons & LCD_BTN_CENTER) {
-            switch(selection) {
-                case 0: leftCarryAuton(); break;
-                case 1: rightCarryAuton(); break;
-                case 2: isCarry(); return; // Back
-            }
-            if (selection != 2) break;
-        }
-        pros::delay(10);
-    }
-}
-
-// resets to the first auton choice screen (i didn't use this function and idk if it works, but wtv)
-void reset(){
-    pros::lcd::clear();
-    pros::lcd::print(0, "Resetting choices");
-    isSkills();
-}
+ASSET(example_txt); // '.' replaced with "_" to make c++ happy
 
 /**
  * Runs during auto
@@ -369,8 +192,13 @@ void reset(){
  * This is an example autonomous routine which demonstrates a lot of the features LemLib has to offer
  */
 void autonomous() {
-    isSkills();
-    
+    // run the auton we picked in the menu
+    switch (selectedAuton) {
+        case 0: autonLeft(); break;
+        case 1: autonRight(); break;
+        case 2: autonMiddle(); break;
+    }
+
 	/*
     // Move to x: 20 and y: 15, and face heading 90. Timeout set to 4000 ms
     chassis.moveToPose(20, 15, 90, 4000);
@@ -404,49 +232,11 @@ void autonomous() {
  * Runs in driver control
  */
 
-/**
- * Runs initialization code. This occurs as soon as the program is started.
- *
- * All other competition modes are blocked by initialize; it is recommended
- * to keep execution time for this mode under a few seconds.
- */
-void initialize() {
-    pros::lcd::initialize(); // initialize brain screen
-    chassis.calibrate(); // calibrate sensors
-
-    isSkills(); // start auton selection menu, it is temporarily here for testing. it should be only in autonomous() during the competition.
-
-    // the default rate is 50. however, if you need to change the rate, you
-    // can do the following.
-    // lemlib::bufferedStdout().setRate(...);
-    // If you use bluetooth or a wired connection, you will want to have a rate of 10ms
-
-    // for more information on how the formatting for the loggers
-    // works, refer to the fmtlib docs
-
-    // thread to for brain screen and position logging
-    
-    pros::Task screenTask([&]() {
-        while (true) {
-            // print robot location to the brain screen
-            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-            // log position telemetry
-            lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
-            // delay to save resources
-            pros::delay(50);
-        }
-    });
-}
-
-// exponential function for intake joystick
 double expo(int input, double k) {
     double x = input / 127.0;
     return (k * x * x * x + (1.0 - k) * x) * 127.0;
 }
-
-// runs during operator control 
+ 
 void opcontrol() {
     // controller
     // loop to continuously update motors
@@ -458,30 +248,6 @@ void opcontrol() {
 
         chassis.arcade(leftY, leftX);
 
-        // CURVATURE DRIVE (optional)
-        // chassis.curvature(leftY, leftX, false);
-        // - leftY: forward/backward input (-127 to 127)
-        // - leftX: turn input (-127 to 127)
-        // - third parameter: allowQuickTurn (true = robot can spin in place when forward input is near 0)
-        // Example with quick turn enabled:
-        // chassis.curvature(leftY, leftX, true);
-		
-		/*
-        // Curvature drive explanation:
-        // chassis.curvature(forward, turn);
-        // - forward: controls the robot's speed forward/backward
-        // - turn: controls turning
-        // Difference from arcade drive:
-        //   - Curvature drive scales turning based on forward speed.
-        //     At high speed, turning is smoother and less twitchy.
-        //     At low speed, turning is sharper for tight maneuvers.
-        //   - Arcade drive (what we're currently using) mixes forward and turn linearly:
-        //     leftPower  = forward + turn
-        //     rightPower = forward - turn
-        //   - Curvature drive is preferred for "car-like" feel and smoother high-speed driving.
-        */
-
-        
         // INTAKE CONTROL Joystick + Buttons
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
         bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
