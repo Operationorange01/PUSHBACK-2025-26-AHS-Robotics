@@ -1,7 +1,7 @@
 #include "main.h"
 #include <cmath>
 #include "lemlib/api.hpp" // IWYU pragma: keep
-
+double turnScale = 0.5;
 // ==============================
 // CONTROLLER
 // ==============================
@@ -47,16 +47,16 @@ lemlib::Drivetrain drivetrain(
 
 // controllers
 lemlib::ControllerSettings linearController(
-    10, 0, 3, 0,
-    0, 0,
-    0, 0,
-    0
+    10, 0, 3, 3,
+    1, 100,
+    3, 500,
+    20
 );
 
 lemlib::ControllerSettings angularController(
-    2, 0, 10, 0,
-    0, 0,
-    0, 0,
+    2, 0, 10, 3,
+    1, 100,
+    3, 500,
     0
 );
 
@@ -86,6 +86,8 @@ lemlib::Chassis chassis(
 // ==============================
 // AUTON PATHS
 // ==============================
+/*
+
 ASSET(path11_txt);
 ASSET(path12_txt);
 ASSET(path13_txt);
@@ -160,13 +162,29 @@ void autonRight() {
 void autonMiddle() {
     chassis.moveToPose(12, 12, 45, 3000);
 }
+*/
+
+void aTAFM( int s1, int s2, int s3, int s4){
+    n1.move_velocity(s1);
+    n2.move_velocity(s2);
+    n3.move_velocity(s3);
+    n4.move_velocity(s4);
+}
+void auton(){
+    aTAFM(200, 200, 200, 200);
+    chassis.moveToPoint(48, 0, true, {.forwards = true});
+    chassis.waitUntilDone();
+    aTAFM(0, 0, 0, 0);
+}
 
 // ==============================
 // INITIALIZE (FIXED)
 // ==============================
+
 void initialize() {
     pros::lcd::initialize();
     chassis.calibrate();
+    
 
     pros::Task screenTask([&]() {
         while (true) {
@@ -185,7 +203,8 @@ void competition_initialize() {}
 // AUTONOMOUS
 // ==============================
 void autonomous() {
-    autonLeft(); // CHANGE THIS IF NEEDED
+    //autonLeft(); // CHANGE THIS IF NEEDED
+    auton();
 }
 
 // ==============================
@@ -197,83 +216,73 @@ double expo(int input, double k) {
 }
 
 void opcontrol() {
+    // Constants
     constexpr int INTAKEJOY_DEADZONE = 15;
     constexpr double INTAKE_EXPO_K = 0.6;
     constexpr int MAX_INTAKE_RPM = 200;
+    constexpr int MANUAL_OUTTAKE_SPEED = 200;
 
+    // Toggle states
     bool outtakeDown = false;
     bool tongueOut = false;
 
-    bool r1Prev = false;
+    // Previous button states
     bool r2Prev = false;
     bool l2Prev = false;
 
     while (true) {
+        // ===== DRIVE =====
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
-        chassis.arcade(leftY, leftX);
+        chassis.arcade(leftY, leftX * turnScale);
 
+        // ===== BUTTONS =====
         bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
-        bool l2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
         bool l1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
+        bool l2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
 
-        if ((r1 && !r1Prev) || (r2 && !r2Prev)) {
+        // ===== OUTTAKE PISTON TOGGLE (R2) =====
+        if (r2 && !r2Prev) {
             outtakeDown = !outtakeDown;
             outtakePiston.set_value(outtakeDown);
         }
-
-        r1Prev = r1;
         r2Prev = r2;
 
+        // ===== TONGUE TOGGLE (L2) =====
         if (l2 && !l2Prev) {
             tongueOut = !tongueOut;
             tonguePiston.set_value(tongueOut);
         }
         l2Prev = l2;
 
+        // ===== OUTTAKE MOTORS =====
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
-
         if (r1) {
-            outtakePiston.set_value(false);
-            n1.move_velocity(200);
-            n2.move_velocity(200);
-            n3.move_velocity(200);
-            n4.move_velocity(200);
-        } 
-        else if (r2) {
-            outtakePiston.set_value(true);
-            n1.move_velocity(0);
-            n2.move_velocity(0);
-            n3.move_velocity(0);
-            n4.move_velocity(0);
-            if (abs(rightY) > INTAKEJOY_DEADZONE) {
-                int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
-                int rpm = (speed * MAX_INTAKE_RPM) / 127;
-                outtakePiston.set_value(false);
-                n1.move_velocity(rpm);
-                n2.move_velocity(rpm);
-                n3.move_velocity(rpm);
-                n4.move_velocity(0);
-                }
+            // Manual override
+            n1.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n2.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n3.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n4.move_velocity(MANUAL_OUTTAKE_SPEED);
         } 
         else if (abs(rightY) > INTAKEJOY_DEADZONE) {
+            // Joystick-controlled intake/outtake
             int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
             int rpm = (speed * MAX_INTAKE_RPM) / 127;
-            outtakePiston.set_value(false);
             n1.move_velocity(rpm);
             n2.move_velocity(rpm);
             n3.move_velocity(rpm);
             n4.move_velocity(0);
         } 
         else {
-            outtakePiston.set_value(false);
+            // Stop motors if no input
             n1.move_velocity(0);
             n2.move_velocity(0);
             n3.move_velocity(0);
             n4.move_velocity(0);
         }
 
+        // ===== WING PISTON =====
         wingPiston.set_value(!l1);
 
         pros::delay(10);
