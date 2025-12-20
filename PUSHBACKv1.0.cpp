@@ -13,7 +13,7 @@ pros::MotorGroup rightMotors({12, 3, 13}, pros::MotorGearset::blue); // right mo
 pros::Motor n1(4, pros::MotorGearset::green);
 pros::Motor n2(5, pros::MotorGearset::green);
 pros::Motor n3(-9, pros::MotorGearset::green);
-pros::Motor n4(7, pros::MotorGearset::green);
+pros::Motor n4(-7, pros::MotorGearset::green);
 
 pros::ADIDigitalOut outtakePiston('B');
 pros::ADIDigitalOut wingPiston('A'); // wing piston ADI port
@@ -87,13 +87,6 @@ lemlib::ExpoDriveCurve steerCurve(3, //the deadband now is 6. any movement lower
 // create the chassis
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
 
-void autonTongueAndFullMotor(bool tong, int speed1, int speed2, int speed3, int speed4)
-tonguePiston.set_value(tong);
-    n1.move_velocity(speed1);
-    n2.move_velocity(speed2);
-    n3.move_velocity(speed3);
-    n4.move_velocity(speed4);
-
 //------------------------
 // OUR AUTONOMOUS MENU SETUP
 //------------------------
@@ -107,41 +100,14 @@ void autonLeft() {
     chassis.waitUntilDone(); // wait for path to finish
 
     //do intake/outtake action here
-    chassis.follow(path11_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path12_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path13_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path14_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path15_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path16_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 100, 100, 100, 100);
-
+    outtakePiston.set_value(true);
+    pros::delay(1000); // wait for a second
+    outtakePiston.set_value(false); // close piston again
 }
 
 void autonRight() {
-    // chassis.follow(path21_txt, 15, 3000, true);
-    chassis.waitUntilDone(); // wait for path to finish
-
-    //do intake/outtake action here
-    chassis.follow(path21_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path22_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path23_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path24_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path25_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path26_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 100, 100, 100, 100);
-
-}
-
+    // right side routine, another sample move
+    chassis.moveToPose(24, 24, 90, 3000); // move diagonally to right
 }
 
 void autonMiddle() {
@@ -153,22 +119,42 @@ void autonMiddle() {
 void selectAutonMenu() {
     pros::lcd::initialize();
     pros::lcd::set_text(1, "Select Autonomous:");
-    pros::lcd::set_text(4, "CENTER = confirm");//Path 1.1
-   
+    pros::lcd::set_text(4, "CENTER = confirm");
+
     pros::lcd::set_text(2, autonNames[selectedAuton]);
 
-    bool longPress = false;
-    while (!longPress) {
+    bool confirmed = false;
+    bool leftPrev = false, rightPrev = false, centerPrev = false;
+
+    while (!confirmed) {
         uint32_t buttons = pros::lcd::read_buttons();
-        if (buttons & LCD_BTN_CENTER) {
-            pros::delay(500); // hold for half a second to confirm
-            longPress = true;
-        } else {
+        bool left = buttons & LCD_BTN_LEFT;
+        bool right = buttons & LCD_BTN_RIGHT;
+        bool center = buttons & LCD_BTN_CENTER;
+
+        // Cycle left
+        if (left && !leftPrev) {
+            selectedAuton--;
+            if (selectedAuton < 0) selectedAuton = NUM_AUTONS - 1;
+            pros::lcd::set_text(2, autonNames[selectedAuton]);
+        }
+
+        // Cycle right
+        if (right && !rightPrev) {
             selectedAuton++;
             if (selectedAuton >= NUM_AUTONS) selectedAuton = 0;
             pros::lcd::set_text(2, autonNames[selectedAuton]);
-            pros::delay(300); // scroll delay
         }
+
+        // Confirm selection
+        if (center && !centerPrev) {
+            confirmed = true;
+        }
+
+        leftPrev = left;
+        rightPrev = right;
+        centerPrev = center;
+
         pros::delay(20);
     }
 }
@@ -225,18 +211,9 @@ void competition_initialize() {}
 
 // get paths for pure pursuit
 // this needs to be put outside a function
-ASSET(path11_txt); // '.' replaced with "_" to make c++ happy
-ASSET(path12_txt);
+ASSET(path12_txt); // '.' replaced with "_" to make c++ happy
+ASSET(path11_txt);
 ASSET(path13_txt);
-ASSET(path14_txt);
-ASSET(path15_txt);
-ASSET(path16_txt);
-ASSET(path21_txt); // '.' replaced with "_" to make c++ happy
-ASSET(path22_txt);
-ASSET(path23_txt);
-ASSET(path24_txt);
-ASSET(path25_txt);
-ASSET(path26_txt);
 
 /**
  * Runs during auto
@@ -247,7 +224,7 @@ void autonomous() {
 
     // ---- TEMP PID TEST ----
     // move forward 24 inches
-    chassis.follow(example_txt, 15, 4000, false);
+    chassis.moveToPose(24, 0, 0, 3000);
     chassis.waitUntilDone();
     pros::delay(1000); // pause
 
@@ -267,74 +244,70 @@ double expo(int input, double k) {
     return (k * x * x * x + (1.0 - k) * x) * 127.0;
 }
 
-void opcontrol() {
+void opcontrol() {                                                                                                                                                                                                                                                                                          
+    // ==============================
+    // DRIVER CONTROL LOOP
+    // ==============================
+    constexpr int INTAKEJOY_DEADZONE = 15;
+    constexpr double INTAKE_EXPO_K = 0.6;
+    constexpr int MAX_INTAKE_RPM = 200;
+
     while (true) {
-        // ==============================
+        // ------------------------------
         // DRIVE CONTROL
-        // ==============================
+        // ------------------------------
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
         chassis.arcade(leftY, leftX);
 
-        // ==============================
-        // INTAKE CONTROL (Buttons + Joystick)
-        // ==============================
+        // ------------------------------
+        // INTAKE/OUTTAKE CONTROL
+        // ------------------------------
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
-        bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
-        bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
+        bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1); // Top outtake
+        bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2); // Middle outtake
 
-        constexpr int INTAKEJOY_DEADZONE = 15;
-        constexpr double INTAKE_EXPO_K = 0.6;
-        constexpr int MAX_INTAKE_RPM = 200;
-
-        // BUTTONS HAVE PRIORITY
         if (r1) {
-            // Top outtake
-            outtakePiston.set_value(false);
-
+            // ---- TOP OUTTAKE ----
+            outtakePiston.set_value(false); // piston down
             n1.move_velocity(200);
             n2.move_velocity(200);
             n3.move_velocity(200);
-            n4.move_velocity(200);
+            n4.move_velocity(200); // n4 only runs for top outtake
         }
         else if (r2) {
-            // Middle outtake
-            outtakePiston.set_value(true);
-
+            // ---- MIDDLE OUTTAKE ----
+            outtakePiston.set_value(true); // piston up
             n1.move_velocity(200);
             n2.move_velocity(200);
             n3.move_velocity(200);
-            n4.move_velocity(0);
+            n4.move_velocity(0); // n4 stays off
         }
         else if (abs(rightY) > INTAKEJOY_DEADZONE) {
-            // Joystick intake
+            // ---- JOYSTICK INTAKE ----
             int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
             int speedRPM = (speed * MAX_INTAKE_RPM) / 127;
-
-            outtakePiston.set_value(false);
-
+            outtakePiston.set_value(false); // piston down
             n1.move_velocity(speedRPM);
             n2.move_velocity(speedRPM);
             n3.move_velocity(speedRPM);
-            n4.move_velocity(0);
+            n4.move_velocity(0); // n4 stays off
         }
         else {
-            // Stop everything
-            outtakePiston.set_value(false);
-
+            // ---- STOP ALL INTAKE MOTORS ----
+            outtakePiston.set_value(false); // piston down
             n1.move_velocity(0);
             n2.move_velocity(0);
             n3.move_velocity(0);
-            n4.move_velocity(0);
+            n4.move_velocity(0); // n4 stays off
         }
 
-        // ==============================
-        // WING CONTROL
-        // ==============================
-        wingPiston.set_value(
-            controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)
-        );
+        // ------------------------------
+        // WING CONTROL (Hold L1)
+        // ------------------------------
+        bool l1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
+        wingPiston.set_value(!l1); // false when held (lower wing), true when released (raise wing)
 
-        pros::delay(10);
+        pros::delay(10); // small delay to prevent CPU overload
     }
 }
