@@ -17,6 +17,7 @@ pros::Motor n4(-7, pros::MotorGearset::green);
 
 pros::ADIDigitalOut outtakePiston('B');
 pros::ADIDigitalOut wingPiston('A'); // wing piston ADI port
+pros::ADIDigitalOut tonguePiston('C'); // pick correct port
 
 // Inertial Sensor on port 10
 pros::Imu imu(19);
@@ -244,13 +245,23 @@ double expo(int input, double k) {
     return (k * x * x * x + (1.0 - k) * x) * 127.0;
 }
 
-void opcontrol() {                                                                                                                                                                                                                                                                                          
+void opcontrol() {
     // ==============================
-    // DRIVER CONTROL LOOP
+    // CONSTANTS
     // ==============================
     constexpr int INTAKEJOY_DEADZONE = 15;
     constexpr double INTAKE_EXPO_K = 0.6;
     constexpr int MAX_INTAKE_RPM = 200;
+
+    // ==============================
+    // STATE TRACKING
+    // ==============================
+    bool outtakeDown = false;   // false = up, true = down
+    bool tongueOut = false;
+
+    bool r1Prev = false;
+    bool r2Prev = false;
+    bool l2Prev = false;
 
     while (true) {
         // ------------------------------
@@ -261,53 +272,79 @@ void opcontrol() {
         chassis.arcade(leftY, leftX);
 
         // ------------------------------
-        // INTAKE/OUTTAKE CONTROL
+        // READ BUTTONS
+        // ------------------------------
+        bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
+        bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
+        bool l2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
+        bool l1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
+
+        // ------------------------------
+        // OUTTAKE PISTON TOGGLE (R1 / R2)
+        // ------------------------------
+        bool outtakeTogglePressed =
+            (r1 && !r1Prev) ||
+            (r2 && !r2Prev);
+
+        if (outtakeTogglePressed) {
+            outtakeDown = !outtakeDown;
+            outtakePiston.set_value(outtakeDown);
+        }
+
+        r1Prev = r1;
+        r2Prev = r2;
+
+        // ------------------------------
+        // TONGUE TOGGLE (L2)
+        // ------------------------------
+        if (l2 && !l2Prev) {
+            tongueOut = !tongueOut;
+            tonguePiston.set_value(tongueOut);
+        }
+        l2Prev = l2;
+
+        // ------------------------------
+        // INTAKE / OUTTAKE MOTORS
         // ------------------------------
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
-        bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1); // Top outtake
-        bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2); // Middle outtake
 
         if (r1) {
             // ---- TOP OUTTAKE ----
-            outtakePiston.set_value(false); // piston down
             n1.move_velocity(200);
             n2.move_velocity(200);
             n3.move_velocity(200);
-            n4.move_velocity(200); // n4 only runs for top outtake
+            n4.move_velocity(200);
         }
         else if (r2) {
             // ---- MIDDLE OUTTAKE ----
-            outtakePiston.set_value(true); // piston up
             n1.move_velocity(200);
             n2.move_velocity(200);
             n3.move_velocity(200);
-            n4.move_velocity(0); // n4 stays off
+            n4.move_velocity(0);
         }
         else if (abs(rightY) > INTAKEJOY_DEADZONE) {
             // ---- JOYSTICK INTAKE ----
             int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
             int speedRPM = (speed * MAX_INTAKE_RPM) / 127;
-            outtakePiston.set_value(false); // piston down
+
             n1.move_velocity(speedRPM);
             n2.move_velocity(speedRPM);
             n3.move_velocity(speedRPM);
-            n4.move_velocity(0); // n4 stays off
+            n4.move_velocity(0);
         }
         else {
-            // ---- STOP ALL INTAKE MOTORS ----
-            outtakePiston.set_value(false); // piston down
+            // ---- STOP INTAKE ----
             n1.move_velocity(0);
             n2.move_velocity(0);
             n3.move_velocity(0);
-            n4.move_velocity(0); // n4 stays off
+            n4.move_velocity(0);
         }
 
         // ------------------------------
-        // WING CONTROL (Hold L1)
+        // WING CONTROL (HOLD L1)
         // ------------------------------
-        bool l1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
-        wingPiston.set_value(!l1); // false when held (lower wing), true when released (raise wing)
+        wingPiston.set_value(!l1);
 
-        pros::delay(10); // small delay to prevent CPU overload
+        pros::delay(10);
     }
 }
