@@ -87,6 +87,13 @@ lemlib::ExpoDriveCurve steerCurve(3, //the deadband now is 6. any movement lower
 // create the chassis
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
 
+void autonTongueAndFullMotor(bool tong, int speed1, int speed2, int speed3, int speed4)
+tonguePiston.set_value(tong);
+    n1.move_velocity(speed1);
+    n2.move_velocity(speed2);
+    n3.move_velocity(speed3);
+    n4.move_velocity(speed4);
+
 //------------------------
 // OUR AUTONOMOUS MENU SETUP
 //------------------------
@@ -100,14 +107,41 @@ void autonLeft() {
     chassis.waitUntilDone(); // wait for path to finish
 
     //do intake/outtake action here
-    outtakePiston.set_value(true);
-    pros::delay(1000); // wait for a second
-    outtakePiston.set_value(false); // close piston again
+    chassis.follow(path11_txt, 15, 4000, true);
+    autonTongueAndFullMotor(true, -100, -100, -100, 0);
+    chassis.follow(path12_txt, 15, 4000, true);
+    autonTongueAndFullMotor(false, 0, 0, 0, 0);
+    chassis.follow(path13_txt, 15, 4000, true);
+    autonTongueAndFullMotor(true, -100, -100, -100, 0);
+    chassis.follow(path14_txt, 15, 4000, true);
+    autonTongueAndFullMotor(false, 0, 0, 0, 0);
+    chassis.follow(path15_txt, 15, 4000, false);
+    autonTongueAndFullMotor(false, 0, 0, 0, 0);
+    chassis.follow(path16_txt, 15, 4000, false);
+    autonTongueAndFullMotor(false, 100, 100, 100, 100);
+
 }
 
 void autonRight() {
-    // right side routine, another sample move
-    chassis.moveToPose(24, 24, 90, 3000); // move diagonally to right
+    // chassis.follow(path21_txt, 15, 3000, true);
+    chassis.waitUntilDone(); // wait for path to finish
+
+    //do intake/outtake action here
+    chassis.follow(path21_txt, 15, 4000, true);
+    autonTongueAndFullMotor(true, -100, -100, -100, 0);
+    chassis.follow(path22_txt, 15, 4000, true);
+    autonTongueAndFullMotor(false, 0, 0, 0, 0);
+    chassis.follow(path23_txt, 15, 4000, true);
+    autonTongueAndFullMotor(true, -100, -100, -100, 0);
+    chassis.follow(path24_txt, 15, 4000, true);
+    autonTongueAndFullMotor(false, 0, 0, 0, 0);
+    chassis.follow(path25_txt, 15, 4000, false);
+    autonTongueAndFullMotor(false, 0, 0, 0, 0);
+    chassis.follow(path26_txt, 15, 4000, false);
+    autonTongueAndFullMotor(false, 100, 100, 100, 100);
+
+}
+
 }
 
 void autonMiddle() {
@@ -191,9 +225,18 @@ void competition_initialize() {}
 
 // get paths for pure pursuit
 // this needs to be put outside a function
-ASSET(path12_txt); // '.' replaced with "_" to make c++ happy
-ASSET(path11_txt);
+ASSET(path11_txt); // '.' replaced with "_" to make c++ happy
+ASSET(path12_txt);
 ASSET(path13_txt);
+ASSET(path14_txt);
+ASSET(path15_txt);
+ASSET(path16_txt);
+ASSET(path21_txt); // '.' replaced with "_" to make c++ happy
+ASSET(path22_txt);
+ASSET(path23_txt);
+ASSET(path24_txt);
+ASSET(path25_txt);
+ASSET(path26_txt);
 
 /**
  * Runs during auto
@@ -204,7 +247,7 @@ void autonomous() {
 
     // ---- TEMP PID TEST ----
     // move forward 24 inches
-    chassis.moveToPose(24, 0, 0, 3000);
+    chassis.follow(example_txt, 15, 4000, false);
     chassis.waitUntilDone();
     pros::delay(1000); // pause
 
