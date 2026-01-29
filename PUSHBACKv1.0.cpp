@@ -12,14 +12,14 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 // ==============================
 // MOTOR GROUPS
 // ==============================
-pros::MotorGroup leftMotors({-1, -11, -2}, pros::MotorGearset::blue);
-pros::MotorGroup rightMotors({12, 3, 13}, pros::MotorGearset::blue);
+pros::MotorGroup leftMotors({-18, -19, -20}, pros::MotorGearset::blue);
+pros::MotorGroup rightMotors({11, 12, 13}, pros::MotorGearset::blue);
 
 // intake/outtake motors
-pros::Motor n1(-4, pros::MotorGearset::green);
-pros::Motor n2(5, pros::MotorGearset::green);
-pros::Motor n3(-9, pros::MotorGearset::green);
-pros::Motor n4(7, pros::MotorGearset::green);
+pros::Motor n1(-1, pros::MotorGearset::green);
+pros::Motor n2(-2, pros::MotorGearset::green);
+pros::Motor n3(-3, pros::MotorGearset::green);
+pros::Motor n4(-4, pros::MotorGearset::green);
 
 // pistons
 pros::ADIDigitalOut outtakePiston('B');
@@ -55,10 +55,10 @@ lemlib::ControllerSettings linear_controller(
     0,
     7,
     0, //average steady state error * 1.5
-    0, //restore to 1 after PID tuning
-    0, //restore to 100 after PID tuning
-    0, //restore to 3 after PID tuning
-    0, //restore to 500 after PID tuning
+    1, //restore to 1 after PID tuning
+    100, //restore to 100 after PID tuning
+    3, //restore to 3 after PID tuning
+    500, //restore to 500 after PID tuning
     0 //ignore for now
 );
 
@@ -67,10 +67,10 @@ lemlib::ControllerSettings angular_controller(
     0,
     15,
     0, //average steady state error * 1.5
-    0, //restore to 1 after PID tuning
-    0, //restore to 100 after PID tuning
-    0, //restore to 3 after PID tuning
-    0, //restore to 500 after PID tuning
+    1, //restore to 1 after PID tuning
+    100, //restore to 100 after PID tuning
+    3, //restore to 3 after PID tuning
+    500, //restore to 500 after PID tuning
     0 //ignore for now
 );
 
@@ -156,42 +156,43 @@ void autonLeft() {
     //autonTongueAndFullMotor(false, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL);
 }
 */
-
+/*
 void autonLeft() {
     int autonMotorSpeedL = 100;
     float maxLeftSpeed = 80;  
+    autonTongueAndFullMotor(true, 0, 0, 0, 0);
 
     // Go to center blocks and start intake
-    chassis.moveToPose(-10, 22.5, 0, 30000, {.forwards = true, .maxSpeed = maxLeftSpeed});
-    chassis.waitUntilDone(); 
-    //autonTongueAndFullMotor(true, -autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL, 0);
+    chassis.moveToPose(-35, 22.5, 80, 3000, {.forwards = true, .maxSpeed = maxLeftSpeed});
+    chassis.waitUntilDone();
+    autonTongueAndFullMotor(true,-autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL);
 
     // Move over the middle blocks
-    chassis.moveToPose(5, 22.5, 0, 30000, {.forwards = true, .maxSpeed = maxLeftSpeed});
-    chassis.waitUntilDone(); 
-    //pros.wait(2000)
-    //autonTongueAndFullMotor(false, 0, 0, 0, 0);
-
+    chassis.moveToPose(-25, 22.5, 90, 3000, {.forwards = true, .maxSpeed = maxLeftSpeed});
+    chassis.waitUntilDone();
+    pros::delay(1000);
+    autonTongueAndFullMotor(true, 0, 0, 0, 0);
+    */
+/*
     // Line up to the match loader
-    chassis.moveToPose(-46, 47, 0, 30000, {.forwards = true, .maxSpeed = maxLeftSpeed});
-    chassis.waitUntilDone(); 
+    chassis.moveToPose(-46, 47, 285, 5000, {.forwards = true, .maxSpeed = maxLeftSpeed});
+    chassis.waitUntilDone();
 
     // Move to the match loader and intake blocks
-    chassis.moveToPose(-46, 47, 0, 30000, {.forwards = true, .maxSpeed = maxLeftSpeed});
-    chassis.waitUntilDone(); 
-    //autonTongueAndFullMotor(true, -autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL, 0);
-    //pros.wait(5000)
+    chassis.moveToPose(-56, 47, 270, 5000, {.forwards = true, .maxSpeed = maxLeftSpeed});
+    chassis.waitUntilDone();
+    //autonTongueAndFullMotor(true, -autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL);
+    //pros.wait(2000)
 
     // Move backward
-    chassis.moveToPose(-20, 47, 0, 30000, {.forwards = false, .maxSpeed = maxLeftSpeed});
+    chassis.moveToPose(-40, 47, 270, 5000, {.forwards = false, .maxSpeed = maxLeftSpeed});
     chassis.waitUntilDone();
     //autonTongueAndFullMotor(false, 0, 0, 0, 0);
 
     // Move to the side goals and dispense
-    chassis.moveToPose(-12, 47, 0, 30000, {.forwards = false, .maxSpeed = maxLeftSpeed});
-    chassis.waitUntilDone(); 
-    //autonTongueAndFullMotor(false, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL);
-}
+    chassis.moveToPose(-33, 47, 270, 5000, {.forwards = false, .maxSpeed = maxLeftSpeed});
+    chassis.waitUntilDone();
+    //autonTongueAndFullMotor(false, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL);*/
 
 
 /*
@@ -234,8 +235,8 @@ void autonMiddle() {
 void initialize() {
     pros::lcd::initialize();
     chassis.calibrate();
-    chassis.setPose( 0, 0, 0);//temporary for PID tuning
-
+    chassis.setPose( -63, 18.5, 90);//temporary for PID tuning
+    tonguePiston.set_value(true); // Tongue Up
     pros::Task screenTask([&]() {
         while (true) {
             pros::lcd::print(0, "X: %f", chassis.getPose().x);
@@ -248,7 +249,9 @@ void initialize() {
 }
 
 void disabled() {}
-void competition_initialize() {}
+void competition_initialize() {
+    tonguePiston.set_value(true); // Tongue Up
+}
 
 // ==============================
 // AUTONOMOUS
@@ -262,12 +265,12 @@ void autonomous() {
     //chassis.moveToPose(0, 0, 90, 30000, {.forwards = false, .maxSpeed = 80});
 
     //currently tunning angular PID
-    chassis.moveToPoint(0, 70, 2000);
+
     //extra stuff
     //chassis.moveToPose(chassis.getPose().x + 100, chassis.getPose().y, chassis.getPose().theta, 2000);
     
     //final:
-    //autonLeft()
+
 }
 
 // ==============================
@@ -279,7 +282,7 @@ double expo(int input, double k) {
 }
 
 void opcontrol() {
-    // Constantsc  
+    // Constants
     constexpr int INTAKEJOY_DEADZONE = 15;
     constexpr double INTAKE_EXPO_K = 0.6;
     constexpr int MAX_INTAKE_RPM = 200;
@@ -287,77 +290,83 @@ void opcontrol() {
 
     // Toggle states
     bool outtakeDown = false;
-    bool tongueOut = false;
+    bool tongueState = false; // false = Up (default), true = Down
 
     // Previous button states
     bool r2Prev = false;
     bool l2Prev = false;
 
     while (true) {
-        // ===== DRIVE =====
+        // ===== 1. DRIVE CONTROL =====
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
-        chassis.arcade(leftY, leftX);
+        
+        // Using expo on leftX to make turning less sensitive
+        chassis.arcade(leftY, expo(leftX, 0.45));
 
-        // ===== BUTTONS =====
+        // ===== 2. INPUT DATA =====
         bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
         bool l1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
         bool l2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
-
-        // Unused buttons (for macros and stuff)
-        bool a = controller.get_digital(pros::E_CONTROLLER_DIGITAL_A);
-        bool b = controller.get_digital(pros::E_CONTROLLER_DIGITAL_B);
-        bool x = controller.get_digital(pros::E_CONTROLLER_DIGITAL_X);
-        bool y = controller.get_digital(pros::E_CONTROLLER_DIGITAL_Y);
-        bool up = controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP);
-        bool down = controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN);
-        bool left = controller.get_digital(pros::E_CONTROLLER_DIGITAL_LEFT);
-        bool right = controller.get_digital(pros::E_CONTROLLER_DIGITAL_RIGHT);
-
-        // ===== OUTTAKE PISTON TOGGLE (R2) =====
-        if (r2 && !r2Prev) {
-            outtakeDown = !outtakeDown;
-            outtakePiston.set_value(outtakeDown);
-        }
-        r2Prev = r2;
-
-        // ===== TONGUE TOGGLE (L2) =====
-        if (l2 && !l2Prev) {
-            tongueOut = !tongueOut;
-            tonguePiston.set_value(tongueOut);
-        }
-        l2Prev = l2;
-
-        // ===== OUTTAKE MOTORS =====
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
+
+        // This variable now only depends on the R1 button
+        bool isOuttaking = r1;
+
+        // ===== 3. INTAKE / OUTTAKE MOTOR LOGIC =====
         if (r1) {
-            // Manual override
+            // Manual Outtake via Button
+            n1.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n2.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n3.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n4.move_velocity(-MANUAL_OUTTAKE_SPEED);
+        }
+        else if (r2) {
+            // Manual Outtake via Button
             n1.move_velocity(MANUAL_OUTTAKE_SPEED);
             n2.move_velocity(MANUAL_OUTTAKE_SPEED);
             n3.move_velocity(MANUAL_OUTTAKE_SPEED);
             n4.move_velocity(MANUAL_OUTTAKE_SPEED);
         } 
-        else if (abs(rightY) > INTAKEJOY_DEADZONE) {
-            // Joystick-controlled intake/outtake
+        else if (std::abs(rightY) > INTAKEJOY_DEADZONE) {
+            // Intake/Outtake via Joystick (Does NOT open the door)
             int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
             int rpm = (speed * MAX_INTAKE_RPM) / 127;
+
             n1.move_velocity(rpm);
             n2.move_velocity(rpm);
             n3.move_velocity(rpm);
-            n4.move_velocity(rpm);
+            n4.move_velocity(0);
         } 
         else {
-            // Stop motors if no input
             n1.move_velocity(0);
             n2.move_velocity(0);
             n3.move_velocity(0);
             n4.move_velocity(0);
         }
 
-        // ===== PISTONS =====
+        // ===== 4. PISTON CONTROL =====
+        
+        doorPiston.set_value(!isOuttaking);
+
+        // TONGUE: Toggle logic
+        if (l2 && !l2Prev) {
+            tongueState = !tongueState;
+        }
+        l2Prev = l2;
+        // Adjust this '!' if the tongue is starting in the wrong position too
+        tonguePiston.set_value(!tongueState); 
+
+        // WINGS
         wingPiston.set_value(!l1);
-        doorPiston.set_value(r1);
+
+        // OUTTAKE PISTON: Toggle logic
+        if (r2 && !r2Prev) {
+            outtakeDown = !outtakeDown;
+            outtakePiston.set_value(outtakeDown);
+        }
+        r2Prev = r2;
 
         pros::delay(10);
     }
