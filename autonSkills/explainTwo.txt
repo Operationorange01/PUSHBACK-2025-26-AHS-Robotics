@@ -1,0 +1,72 @@
+Function: autonDriveAndIntake
+
+void autonDriveAndIntake(double targetX, double targetY, int timeoutMs, int intakeSpeed = 200)
+Defines a function to drive straight to a target while running the intake.
+
+n1.move_velocity(intakeSpeed); n2.move_velocity(intakeSpeed); n3.move_velocity(intakeSpeed); n4.move_velocity(0);
+Start the intake motors at the specified speed. Keep the outtake motor off.
+
+chassis.moveToPose(targetX, targetY, chassis.getPose().theta, timeoutMs)
+Drive to the target coordinates without changing the robot’s heading.
+
+chassis.waitUntilDone()
+Wait until the drive finishes or times out.
+
+n1.move_velocity(0); n2.move_velocity(0); n3.move_velocity(0)
+Stop the intake motors once the move is complete.
+
+Function: autonMoveToPosition
+
+void autonMoveToPosition(double targetX, double targetY, int timeoutMs, int intakeSpeed = 0)
+Defines a function to drive to a position and automatically turn to face it first. Intake optional.
+
+double dx = targetX - chassis.getPose().x; double dy = targetY - chassis.getPose().y;
+Calculate the difference between the current position and the target.
+
+double headingDeg = atan2(dy, dx) * 180.0 / M_PI;
+Compute the angle the robot needs to face to head directly to the target.
+
+if (intakeSpeed > 0) {...}
+Start the intake motors if a speed was given. Outtake remains off.
+
+chassis.turnTo(headingDeg)
+Turn the robot to face the target.
+
+chassis.waitUntilDone()
+Wait until rotation is finished.
+
+chassis.moveToPose(targetX, targetY, headingDeg, timeoutMs)
+Drive straight to the target while keeping the heading toward it.
+
+chassis.waitUntilDone()
+Wait until drive finishes or times out.
+
+if (intakeSpeed > 0) {...}
+Stop the intake motors if they were running.
+
+Function: autonOuttake
+
+void autonOuttake(int speed = 200)
+Spins all intake/outtake motors forward to release blocks.
+
+pros::delay(2000)
+Keep spinning for 2 seconds to make sure all blocks are deposited.
+
+Then stop all motors.
+
+Function: autonomous
+
+chassis.setPose(-153, -43, 0)
+Set the robot’s starting position and heading.
+
+autonDriveAndIntake(-76, -59, 3000, 200)
+Drive to the first block line while intaking. Timeout: 3 seconds.
+
+autonMoveToPosition(-76.743, -121.431, 4000)
+Move to the next block line. Robot turns to face it automatically. Timeout: 4 seconds.
+
+autonMoveToPosition(-61.261, -121.431, 3000)
+Move to the long goal. Robot automatically faces the goal. Timeout: 3 seconds.
+
+autonOuttake(200)
+Release all blocks into the goal at speed 200.
