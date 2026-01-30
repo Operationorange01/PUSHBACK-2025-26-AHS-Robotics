@@ -126,22 +126,22 @@ void autonLeft() {
 
     // Go to center blocks and start intake
     chassis.follow(path11_txt, 15, 4000, true);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
     //autonTongueAndFullMotor(true, -autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL, 0);
 
     // Move over the middle blocks
     chassis.follow(path12_txt, 15, 4000, true);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
     //pros.wait(2000)
     //autonTongueAndFullMotor(false, 0, 0, 0, 0);
 
     // Line up to the match loader
     chassis.follow(path13_txt, 15, 4000, true);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
 
     // Move to the match loader and intake blocks
     chassis.follow(path14_txt, 15, 4000, true);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
     //autonTongueAndFullMotor(true, -autonMotorSpeedL, -autonMotorSpeedL, -autonMotorSpeedL, 0);
     //pros.wait(5000)
 
@@ -152,7 +152,7 @@ void autonLeft() {
 
     // Move to the side goals and dispense
     chassis.follow(path16_txt, 15, 4000, false);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
     //autonTongueAndFullMotor(false, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL, autonMotorSpeedL);
 }
 */
@@ -201,25 +201,25 @@ void autonRight() {
 
     chassis.follow(path21_txt, 12, 4000, true);
     autonTongueAndFullMotor(true, -autonMotorSpeedR, -autonMotorSpeedR, -autonMotorSpeedR, 0);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
 
     chassis.follow(path22_txt, 12, 4000, true);
     autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
 
     chassis.follow(path23_txt, 12, 4000, true);
     autonTongueAndFullMotor(true, -autonMotorSpeedR, -autonMotorSpeedR, -autonMotorSpeedR, 0);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
 
     chassis.follow(path24_txt, 12, 4000, true);
     autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.waitUntilDone(); 
-    
+    chassis.waitUntilDone();
+   
     chassis.follow(path25_txt, 12, 4000, false);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
 
     chassis.follow(path26_txt, 12, 4000, false);
-    chassis.waitUntilDone(); 
+    chassis.waitUntilDone();
 
     autonTongueAndFullMotor(false, autonMotorSpeedR, autonMotorSpeedR, autonMotorSpeedR, autonMotorSpeedR);
 }
@@ -245,7 +245,7 @@ void initialize() {
             pros::delay(50);
         }
     });
-    
+   
 }
 
 void disabled() {}
@@ -253,25 +253,68 @@ void competition_initialize() {
     tonguePiston.set_value(true); // Tongue Up
 }
 
+// move forward while intaking blocks
+void autonDriveAndIntake(double targetX, double targetY, int timeoutMs, int intakeSpeed = 200) {
+    // start intake motors
+    n1.move_velocity(intakeSpeed);
+    n2.move_velocity(intakeSpeed);
+    n3.move_velocity(intakeSpeed);
+    n4.move_velocity(0); // outtake stays off
+
+    // start driving to the target
+    chassis.moveToPose(targetX, targetY, chassis.getPose().theta, timeoutMs);
+
+    // wait until drive is done
+    chassis.waitUntilDone();
+
+    // stop intake motors
+    n1.move_velocity(0);
+    n2.move_velocity(0);
+    n3.move_velocity(0);
+}
+
+// turn then drive
+void autonTurnAndDrive(double headingDeg, double targetX, double targetY, int timeoutMs) {
+    chassis.turnTo(headingDeg);       // rotate in place
+    chassis.waitUntilDone();
+
+    chassis.moveToPose(targetX, targetY, headingDeg, timeoutMs);  // drive forward
+    chassis.waitUntilDone();
+}
+
+// outtake all blocks
+void autonOuttake(int speed = 200) {
+    n1.move_velocity(speed);
+    n2.move_velocity(speed);
+    n3.move_velocity(speed);
+    n4.move_velocity(speed);
+    pros::delay(2000); // run for 2 seconds, adjust as needed
+    n1.move_velocity(0);
+    n2.move_velocity(0);
+    n3.move_velocity(0);
+    n4.move_velocity(0);
+}
+
+
 // ==============================
 // AUTONOMOUS
 // ==============================
 void autonomous() {
+    // set start pose
+    chassis.setPose(-153, -43, 0);
 
-    //start pos (temporary, i think, as long as the game connect board thingy gives start pos before autonomous runs.)
-    //(will be changed to chassis.setPose( -63, 22.5, 0); when starting final path/)
-    
-    //currently tunning lateral PID
-    //chassis.moveToPose(0, 0, 90, 30000, {.forwards = false, .maxSpeed = 80});
+    // drive to blocks while intaking
+    autonDriveAndIntake(-76, -59, 3000);
 
-    //currently tunning angular PID
+    // after intake leg
+    autonTurnAndDrive(???, -76.743, -121.431, 4000); // replace ??? with the turn angle
 
-    //extra stuff
-    //chassis.moveToPose(chassis.getPose().x + 100, chassis.getPose().y, chassis.getPose().theta, 2000);
-    
-    //final:
+    // turn to long goal and move to deposit
+    autonTurnAndDrive(-90, -61.261, -121.431, 3000); // turn to face goal and drive
+    autonOuttake(200); // deposit all blocks
 
 }
+
 
 // ==============================
 // DRIVER CONTROL
@@ -300,7 +343,7 @@ void opcontrol() {
         // ===== 1. DRIVE CONTROL =====
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
-        
+       
         // Using expo on leftX to make turning less sensitive
         chassis.arcade(leftY, expo(leftX, 0.45));
 
@@ -328,7 +371,7 @@ void opcontrol() {
             n2.move_velocity(MANUAL_OUTTAKE_SPEED);
             n3.move_velocity(MANUAL_OUTTAKE_SPEED);
             n4.move_velocity(MANUAL_OUTTAKE_SPEED);
-        } 
+        }
         else if (std::abs(rightY) > INTAKEJOY_DEADZONE) {
             // Intake/Outtake via Joystick (Does NOT open the door)
             int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
@@ -338,7 +381,7 @@ void opcontrol() {
             n2.move_velocity(rpm);
             n3.move_velocity(rpm);
             n4.move_velocity(0);
-        } 
+        }
         else {
             n1.move_velocity(0);
             n2.move_velocity(0);
@@ -347,7 +390,7 @@ void opcontrol() {
         }
 
         // ===== 4. PISTON CONTROL =====
-        
+       
         doorPiston.set_value(!isOuttaking);
 
         // TONGUE: Toggle logic
@@ -356,7 +399,7 @@ void opcontrol() {
         }
         l2Prev = l2;
         // Adjust this '!' if the tongue is starting in the wrong position too
-        tonguePiston.set_value(!tongueState); 
+        tonguePiston.set_value(!tongueState);
 
         // WINGS
         wingPiston.set_value(!l1);
