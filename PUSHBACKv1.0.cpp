@@ -18,8 +18,7 @@ pros::MotorGroup rightMotors({11, 12, 13}, pros::MotorGearset::blue);
 // intake/outtake motors
 pros::Motor n1(-1, pros::MotorGearset::green);
 pros::Motor n2(-2, pros::MotorGearset::green);
-pros::Motor n3(-3, pros::MotorGearset::green);
-pros::Motor n4(-4, pros::MotorGearset::green);
+pros::Motor n3(3, pros::MotorGearset::green);
 
 // pistons
 pros::ADIDigitalOut outtakePiston('B');
@@ -30,7 +29,7 @@ pros::ADIDigitalOut doorPiston('C');
 // sensors
 pros::Imu imu(19);
 pros::Rotation horizontalEnc(-10);
-pros::Rotation verticalEnc(-20);
+pros::Rotation verticalEnc(15);
 
 // tracking wheels
 // tracking wheels (Changed from NEW_275 to 2.0)
@@ -114,7 +113,6 @@ void autonTongueAndFullMotor(bool tong, int s1, int s2, int s3, int s4) {
     n1.move_velocity(s1);
     n2.move_velocity(s2);
     n3.move_velocity(s3);
-    n4.move_velocity(s4);
 }
 
 // ==============================
@@ -320,14 +318,12 @@ void opcontrol() {
             n1.move_velocity(MANUAL_OUTTAKE_SPEED);
             n2.move_velocity(MANUAL_OUTTAKE_SPEED);
             n3.move_velocity(MANUAL_OUTTAKE_SPEED);
-            n4.move_velocity(-MANUAL_OUTTAKE_SPEED);
         }
         else if (r2) {
             // Manual Outtake via Button
             n1.move_velocity(MANUAL_OUTTAKE_SPEED);
-            n2.move_velocity(MANUAL_OUTTAKE_SPEED);
-            n3.move_velocity(MANUAL_OUTTAKE_SPEED);
-            n4.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n2.move_velocity(-MANUAL_OUTTAKE_SPEED);
+            n3.move_velocity(-MANUAL_OUTTAKE_SPEED);
         } 
         else if (std::abs(rightY) > INTAKEJOY_DEADZONE) {
             // Intake/Outtake via Joystick (Does NOT open the door)
@@ -336,14 +332,12 @@ void opcontrol() {
 
             n1.move_velocity(rpm);
             n2.move_velocity(rpm);
-            n3.move_velocity(rpm);
-            n4.move_velocity(0);
+            n2.move_velocity(0);
         } 
         else {
             n1.move_velocity(0);
             n2.move_velocity(0);
             n3.move_velocity(0);
-            n4.move_velocity(0);
         }
 
         // ===== 4. PISTON CONTROL =====
