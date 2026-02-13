@@ -95,14 +95,9 @@ lemlib::Chassis chassis(
 );
 
 // ==============================
-// AUTON PATHS
-// ==============================
-
-
-
-// ==============================
 // AUTON HELPERS
 // ==============================
+
 // function for motor movements and tongue mech.
 void movements(bool tongue, int motor1, int motor2and3){          // REVIEW LOGIC FOR THIS FUNCTION!!!!!!!
     tonguePiston.set_value(tongue);
@@ -118,6 +113,56 @@ void test(){
     // turn to face heading 90 with a very long timeout
     chassis.turnToHeading(90, 100000);
 }
+
+
+// Decide which goal is being emptied, assign according values, and then empty the goal
+void outtakeAndGoal(corner, autonMotorSpeedS, autonMoveSpeedS){
+    var x,y,face,goal
+    if(corner == 0){
+        x = -1;
+        y = -1;
+        face = 180;
+        goal = 270
+    } else if(corner == 1){
+        x = -1;
+        y = 1;
+        face = 0;
+        goal = 270;
+    } else if(corner == 2){
+        x = 1;
+        y = 1;
+        face = 40;
+        goal = 90;
+    } else if(corner == 3){
+        x = 1;
+        y = -1;
+        face = 180;
+        goal = 90;    
+    }
+    
+    // 1. Line up with the goal 
+    chassis.moveToPose(x*44, y*47, face, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+    movements(false, autonMotorSpeeds, -autonMotorSpeeds);
+    
+    // 2. Go to the goal
+    chassis.moveToPose(x*56, y*47, goal, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+    shakeTongueMech(x,y,goal);
+
+    // 3. Leave the goal
+    chassis.moveToPose(x*44, y*47, goal, 6000, {.forwards = false, .maxSpeed = autonMoveSpeedS});
+    movements(true, 0, 0);
+}
+
+void shakeTongueMech(x,y,goal){
+    for(int i = 0; i < 4; i++) {
+        chassis.moveToPose(x*60, y*47, goal, 500);
+        pros::delay(500);
+    }
+}
+
+// ==============================
+// AUTON PATHS
+// ==============================
 
 // use when testing the auton path. Test one section before adding the next section
 void leftAuton(){
@@ -157,6 +202,39 @@ void leftAuton(){
     movements(true, autonMotorSpeedL, -autonMotorSpeedL);
     */
 
+}
+
+void skillsAuton(){
+    //start -61,-16, 90
+    float autonMotorSpeedS = 80;
+    float autonMoveSpeedS = 80;
+    movements(true, 0, 0);
+
+    // 1. Get away from the parking zone
+    chassis.moveToPose(-44, -16, 90, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+
+    // 2. Empty the bottom left goal
+    outtakeAndGoal(0, autonMotorSpeedS, autonMoveSpeedS);
+
+    // 3. Empty the top left goal
+    outtakeAndGoal(1, autonMotorSpeedS, autonMoveSpeedS);
+
+    // 4. Go to the center
+    chassis.moveToPose(-25, 25, 140, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+    chassis.moveToPose(25, 25, 90, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+
+    // 5. Empty the top right goal
+    outtakeAndGoal(2, autonMotorSpeedS, autonMoveSpeedS);
+
+    // 6. Empty the bottom right goal
+    outtakeAndGoal(3, autonMotorSpeedS, autonMoveSpeedS);
+
+    // 7. Go to the center
+    chassis.moveToPose(25, -25, 320, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+    chassis.moveToPose(-25, -25, 270, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+
+    // 8. Line up with the parking spot
+    chassis.moveToPose(-66, 3, 340, 6000, {.forwards = true, .maxSpeed = 127});
 }
 
 void initialize() {
