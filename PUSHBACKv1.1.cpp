@@ -100,9 +100,9 @@ lemlib::Chassis chassis(
 // function for motor movements and tongue mech.
 void movements(bool tongue, int motor1, int motor2and3){          // REVIEW LOGIC FOR THIS FUNCTION!!!!!!!
     tonguePiston.set_value(tongue);
-    n1.move_velocity(motor1);
-    n2.move_velocity(motor2and3);
-    n3.move_velocity(motor2and3);
+    n1.move(motor1);
+    n2.move(motor2and3);
+    n3.move(motor2and3);
 }
 
 // use when tuning the PID
@@ -114,13 +114,19 @@ void test(){
 }
 
 // Shake Tongue Mech
-void shakeTongueMech(int x,int y, int goal){
-    for(int i = 0; i < 4; i++) {
-        chassis.moveToPose(x*60, y*47, goal, 500);
-        pros::delay(500);
+void shakeTongueMech(int cycles) {
+    for (int i = 0; i < cycles; i++) {
+        leftMotors.move(-120);
+        rightMotors.move(-120);
+
+        pros::delay(100); 
+        leftMotors.move(0);
+        rightMotors.move(0);
+        pros::delay(200);
+
+        
     }
 }
-
 void shakeTongueMech2(int x,int y, int goal){
     for(int i = 0; i < 4; i++) {
         chassis.moveToPose(x, y, goal, 500);
@@ -129,42 +135,7 @@ void shakeTongueMech2(int x,int y, int goal){
 }
 
 // Decide which goal is being emptied, assign according values, and then empty the goal
-void outtakeAndGoal(int corner, int autonMotorSpeedS, float autonMoveSpeedS){
-    int x,y,face,goal;
-    if(corner == 0){
-        x = -1;
-        y = -1;
-        face = 180;
-        goal = 270;
-    } else if(corner == 1){
-        x = -1;
-        y = 1;
-        face = 0;
-        goal = 270;
-    } else if(corner == 2){
-        x = 1;
-        y = 1;
-        face = 40;
-        goal = 90;
-    } else if(corner == 3){
-        x = 1;
-        y = -1;
-        face = 180;
-        goal = 90;    
-    }
-    
-    // 1. Line up with the goal 
-    chassis.moveToPose(x*44, y*47, face, 6000, {.forwards = false, .maxSpeed = autonMoveSpeedS});
-    movements(false, autonMotorSpeedS, -autonMotorSpeedS);
-    
-    // 2. Go to the goal
-    chassis.moveToPose(x*56, y*47, goal, 6000, {.forwards = false, .maxSpeed = autonMoveSpeedS});
-    shakeTongueMech(x,y,goal);
 
-    // 3. Leave the goal
-    chassis.moveToPose(x*44, y*47, goal, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
-    movements(true, 0, 0);
-}
 
 // ==============================
 // AUTON PATHS
@@ -210,40 +181,7 @@ void leftAuton(){
 
 }
 
-void skillsAuton(){
-    //start -61,-16, 90
-    float autonMotorSpeedS = 50;
-    float autonMoveSpeedS = 80;
-    movements(true, 0, 0);
 
-    // 1. Get away from the parking zone
-    chassis.moveToPose(-44, -16, 90, 2000, {.forwards = false, .maxSpeed = autonMoveSpeedS});
-
-    // 2. Empty the bottom left goal
-    outtakeAndGoal(0, autonMotorSpeedS, -autonMoveSpeedS);
-
-    /*
-    // 3. Empty the top left goal
-    outtakeAndGoal(1, autonMotorSpeedS, autonMoveSpeedS);
-
-    // 4. Go to the center
-    chassis.moveToPose(-25, 25, 140, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
-    chassis.moveToPose(25, 25, 90, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
-
-    // 5. Empty the top right goal
-    outtakeAndGoal(2, autonMotorSpeedS, autonMoveSpeedS);
-
-    // 6. Empty the bottom right goal
-    outtakeAndGoal(3, autonMotorSpeedS, autonMoveSpeedS);
-
-    // 7. Go to the center
-    chassis.moveToPose(25, -25, 320, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
-    chassis.moveToPose(-25, -25, 270, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
-
-    // 8. Line up with the parking spot
-    chassis.moveToPose(-66, 3, 310, 6000, {.forwards = true, .maxSpeed = 127});
-    */ 
-}
 
 void initialize() {
     pros::lcd::initialize();
@@ -278,7 +216,7 @@ void initialize() {
 
 void disabled() {}
 void competition_initialize() {
-    tonguePiston.set_value(true); // Tongue Up
+    tonguePiston.set_value(false); // Tongue Up
 }
 
 // ==============================
@@ -287,24 +225,28 @@ void competition_initialize() {
 void autonomous() {
     // Set position
     
+    tonguePiston.set_value(false); // Tongue Up
+
+    chassis.moveToPoint(0,-22, 1000,{.forwards = false});
     
-    chassis.moveToPoint(0,-22, 2000,{.forwards = false});
+    chassis.turnToHeading(90,1000);
+    chassis.moveToPoint(-31,-25, 1000,{.forwards = false});
+    chassis.turnToHeading(180,1000);
     
-    chassis.turnToHeading(90,2000);
-    chassis.moveToPoint(-31,-25, 2000,{.forwards = false});
-    chassis.turnToHeading(180,2000);
-    tonguePiston.set_value(false);
-    chassis.moveToPoint(-33,-10, 2000,{.forwards = false});
-    movements(false,50,-50);
-    shakeTongueMech(-33,-5, 180);
+    tonguePiston.set_value(true);
+    chassis.moveToPoint(-33,-8, 1000,{.forwards = false});
+    
+    chassis.waitUntilDone();
+    movements(true,127,-127);
+    
+
+    shakeTongueMech(12);
+    /*
     chassis.moveToPoint(-32,-26, 2000,{.forwards = false});
     movements(true,0,0);
     chassis.turnToHeading(240, 2000);
     chassis.moveToPoint(4,-5,2000,{.forwards = false});
-    //skillsAuton();
-    
-
-    chassis.turnToHeading(0,2000);
+    */ 
 }
 
 // ==============================
