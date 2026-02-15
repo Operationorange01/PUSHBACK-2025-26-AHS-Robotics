@@ -5,14 +5,15 @@
 #include "pros/adi.hpp"
 #include "pros/misc.h"
 
-// ==============================
+//Global Variables
+
+pros::Task* motorTask = nullptr;
+bool motorsRunning = false;
+
 // CONTROLLER
-// ==============================
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
-// ==============================
 // MOTOR GROUPS
-// ==============================
 pros::MotorGroup leftMotors({-18, -19, -20}, pros::MotorGearset::blue);
 pros::MotorGroup rightMotors({11, 12, 13}, pros::MotorGearset::blue);
 
@@ -36,9 +37,7 @@ pros::Rotation verticalEnc(15);
 // horizontal tracking wheel removed
 lemlib::TrackingWheel vertical(&verticalEnc, 2.0, 0);
 
-// ==============================
 // DRIVETRAIN
-// ==============================
 lemlib::Drivetrain drivetrain(
     &leftMotors,
     &rightMotors,
@@ -93,25 +92,87 @@ lemlib::Chassis chassis(
     &steerCurve
 );
 
-// ==============================
-// AUTON HELPERS
-// ==============================
 
 // function for motor movements and tongue mech.
-void movements(bool tongue, int motor1, int motor2and3){          // REVIEW LOGIC FOR THIS FUNCTION!!!!!!!
+void movements(bool tongue, int motor1, int motor2and3, int duration_ms = 0, bool unjam = false) {
     tonguePiston.set_value(tongue);
-    n1.move(motor1);
-    n2.move(motor2and3);
-    n3.move(motor2and3);
+    
+    // Stop any existing motor task first
+    if (motorTask != nullptr) {
+        motorsRunning = false;
+        pros::delay(50); // Give task time to stop
+        delete motorTask;
+        motorTask = nullptr;
+    }
+    
+    if (duration_ms > 0) {
+        // Non-blocking mode with timed operation
+        motorsRunning = true;
+        
+        motorTask = new pros::Task([motor1, motor2and3, duration_ms, unjam]() {
+            unsigned long startTime = pros::millis();
+            unsigned long lastUnjamTime = pros::millis();
+            
+            while (motorsRunning && (pros::millis() - startTime < duration_ms)) {
+                if (unjam) {
+                    unsigned long elapsed = pros::millis() - lastUnjamTime;
+                    
+                    // Run forward for 3 seconds
+                    if (elapsed < 3000) {
+                        n1.move(motor1);
+                        n2.move(motor2and3);
+                        n3.move(motor2and3);
+                    }
+                    // Run backward for 0.5 seconds
+                    else if (elapsed < 3500) {
+                        n1.move(-motor1);
+                        n2.move(-motor2and3);
+                        n3.move(-motor2and3);
+                    }
+                    // Reset cycle
+                    else {
+                        lastUnjamTime = pros::millis();
+                    }
+                } else {
+                    // No unjamming, just run motors normally
+                    n1.move(motor1);
+                    n2.move(motor2and3);
+                    n3.move(motor2and3);
+                }
+                
+                pros::delay(10);
+            }
+            
+            // Stop motors when done
+            n1.move(0);
+            n2.move(0);
+            n3.move(0);
+            motorsRunning = false;
+        });
+    } else {
+        // Blocking mode (original behavior) - immediate control
+        n1.move(motor1);
+        n2.move(motor2and3);
+        n3.move(motor2and3);
+    }
 }
 
-// use when tuning the PID
-void test(){
-    // set position to x:0, y:0, heading:0
-    chassis.setPose(0, 0, 0);
-    // turn to face heading 90 with a very long timeout
-    chassis.turnToHeading(90, 100000);
+// Stop motors early and clean up task
+void stopMotors() {
+    motorsRunning = false;
+    
+    if (motorTask != nullptr) {
+        pros::delay(50); // Give task time to stop
+        delete motorTask;
+        motorTask = nullptr;
+    }
+    
+    n1.move(0);
+    n2.move(0);
+    n3.move(0);
 }
+
+
 
 // Shake Tongue Mech
 void shakeTongueMech(int cycles) {
@@ -127,14 +188,8 @@ void shakeTongueMech(int cycles) {
         
     }
 }
-void shakeTongueMech2(int x,int y, int goal){
-    for(int i = 0; i < 4; i++) {
-        chassis.moveToPose(x, y, goal, 500);
-        pros::delay(500);
-    }
-}
 
-// Decide which goal is being emptied, assign according values, and then empty the goal
+
 
 
 // ==============================
@@ -142,44 +197,6 @@ void shakeTongueMech2(int x,int y, int goal){
 // ==============================
 
 // use when testing the auton path. Test one section before adding the next section
-void leftAuton(){
-    float autonMotorSpeedL = 80;
-    float autonMoveSpeedL = 80;
-    movements(true, 0, 0); // set everything to default (motors off, tongue mech up)
-
-    // Go to center blocks and start intake
-    chassis.moveToPose(-35, 22.5, 80, 2000, {.forwards = true, .maxSpeed = autonMoveSpeedL});
-    //chassis.waitUntilDone();
-    movements(true, autonMotorSpeedL, 0);
-    
-    /*
-    // Move over the middle blocks
-    chassis.moveToPose(-25, 22.5, 90, 3000, {.forwards = true, .maxSpeed = autonMoveSpeedL});
-    chassis.waitUntilDone();
-    pros::delay(1000); //wait for intake to be done
-    movements(true, 0, 0);
-
-    // Line up to the match loader
-    chassis.moveToPose(-46, 47, 285, 5000, {.forwards = true, .maxSpeed = autonMoveSpeedL});
-    chassis.waitUntilDone();
-    movements(false, autonMotorSpeedL, 0);
-
-    // Move to the match loader and intake blocks
-    chassis.moveToPose(-56, 47, 270, 5000, {.forwards = true, .maxSpeed = autonMoveSpeedL});
-    //might need to add shake function here
-    pros::delay(2000); //wait for intake to be done
-
-    // Move backward
-    chassis.moveToPose(-40, 47, 270, 5000, {.forwards = false, .maxSpeed = autonMoveSpeedL});
-    movements(true, 0, 0);
-
-    // Move to the side goals and dispense
-    chassis.moveToPose(-33, 47, 270, 5000, {.forwards = false, .maxSpeed = autonMoveSpeedL});
-    chassis.waitUntilDone();
-    movements(true, autonMotorSpeedL, -autonMotorSpeedL);
-    */
-
-}
 
 
 
@@ -223,35 +240,48 @@ void competition_initialize() {
 // AUTONOMOUS
 // ==============================
 void autonomous() {
-    // Set position
-    
     tonguePiston.set_value(false); // Tongue Up
 
     chassis.moveToPoint(0,-22, 1000,{.forwards = false});
+    chassis.waitUntilDone();
     
     chassis.turnToHeading(90,1000);
+    chassis.waitUntilDone();
+    
     chassis.moveToPoint(-31,-25, 1000,{.forwards = false});
+    chassis.waitUntilDone();
+    
     chassis.turnToHeading(180,1000);
+    chassis.waitUntilDone();
     
     tonguePiston.set_value(true);
-    chassis.moveToPoint(-33,-8, 1000,{.forwards = false});
-    
+    chassis.moveToPose(-34,-8, 180, 1000,{.forwards = false});
     chassis.waitUntilDone();
-    movements(true,127,-127);
     
+    // Start outtaking with unjamming for 8 seconds (non-blocking)
+    movements(true, 127, -127, 8000, true);
+    
+    // Shake while motors are still running and unjamming!
+    shakeTongueMech(14);
+    
+    chassis.setPose(0, 0, 0);
+        
+    chassis.moveToPoint(0, 12, 1000);
+    chassis.waitUntilDone();
 
-    shakeTongueMech(12);
-    /*
-    chassis.moveToPoint(-32,-26, 2000,{.forwards = false});
-    movements(true,0,0);
-    chassis.turnToHeading(240, 2000);
-    chassis.moveToPoint(4,-5,2000,{.forwards = false});
-    */ 
+    chassis.turnToHeading(60, 1000);
+    chassis.waitUntilDone();
+
+    tonguePiston.set_value(false);
+
+    chassis.moveToPoint(-48, -5, 4000);
+    chassis.waitUntilDone();
+    // Motors will auto-stop after 8 seconds
+    // Or stop them manually:
+    // stopMotors();
 }
 
-// ==============================
 // DRIVER CONTROL
-// ==============================
 double expo(int input, double k) {
     double x = input / 127.0;
     return (k * x * x * x + (1.0 - k) * x) * 127.0;
