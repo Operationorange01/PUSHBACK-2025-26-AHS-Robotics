@@ -4,6 +4,7 @@
 #include "lemlib/chassis/chassis.hpp"
 #include "pros/adi.hpp"
 #include "pros/misc.h"
+#include "pros/rtos.hpp"
 
 //Global Variables
 
@@ -94,9 +95,10 @@ lemlib::Chassis chassis(
 
 
 // function for motor movements and tongue mech.
-void movements(bool tongue, int motor1, int motor2and3, int duration_ms = 0, bool unjam = false) {
+void movements(bool tongue, bool door, int motor1, int motor2and3, int duration_ms = 0, bool unjam = false) {
     tonguePiston.set_value(tongue);
-    
+    doorPiston.set_value(door);
+
     // Stop any existing motor task first
     if (motorTask != nullptr) {
         motorsRunning = false;
@@ -180,9 +182,9 @@ void shakeTongueMech(int cycles) {
         leftMotors.move(-120);
         rightMotors.move(-120);
 
-        pros::delay(100); 
-        leftMotors.move(0);
-        rightMotors.move(0);
+        pros::delay(300); 
+        leftMotors.move(80);
+        rightMotors.move(80);
         pros::delay(200);
 
         
@@ -239,46 +241,35 @@ void competition_initialize() {
 // ==============================
 // AUTONOMOUS
 // ==============================
+
 void autonomous() {
-    tonguePiston.set_value(false); // Tongue Up
+    // Start values and speed
+    int autoSpeed = 400;
+    movements(false, true, 0, 0, 0, false);
 
-    chassis.moveToPoint(0,-22, 1000,{.forwards = false});
+    // Move to in front of the balls
+    chassis.moveToPose(4, -28, -9, 1000, {.forwards = false});
+    movements(false, true, autoSpeed, 0, 4000, false);
+
+    chassis.moveToPoint(7,-45, 750, {.forwards = false, .maxSpeed = 100});
+    chassis.turnToHeading(235,500);
+
+    // Line up with the loader and turn towards it
+    chassis.moveToPoint(32,-22, 1000, {.forwards = false,.maxSpeed = 80});
+    chassis.turnToHeading(180, 500);
+
+    // Go to the loader after being lined up and take blocks
+    movements(true, true, autoSpeed, 0, 5000, false);
+    chassis.moveToPoint(32,-7.5, 750, {.forwards = false,.maxSpeed = 80});
     chassis.waitUntilDone();
-    
-    chassis.turnToHeading(90,1000);
-    chassis.waitUntilDone();
-    
-    chassis.moveToPoint(-31,-25, 1000,{.forwards = false});
-    chassis.waitUntilDone();
-    
-    chassis.turnToHeading(180,1000);
-    chassis.waitUntilDone();
-    
-    tonguePiston.set_value(true);
-    chassis.moveToPose(-34,-8, 180, 1000,{.forwards = false});
-    chassis.waitUntilDone();
-    
-    // Start outtaking with unjamming for 8 seconds (non-blocking)
-    movements(true, 127, -127, 8000, true);
-    
-    // Shake while motors are still running and unjamming!
-    shakeTongueMech(14);
-    
-    chassis.setPose(0, 0, 0);
-        
-    chassis.moveToPoint(0, 12, 1000);
+    shakeTongueMech(6);
     chassis.waitUntilDone();
 
-    chassis.turnToHeading(60, 1000);
-    chassis.waitUntilDone();
 
-    tonguePiston.set_value(false);
-
-    chassis.moveToPoint(-48, -5, 4000);
+    chassis.moveToPoint(32,-36.5, 1000, {.forwards = true,.maxSpeed = 100});
     chassis.waitUntilDone();
-    // Motors will auto-stop after 8 seconds
-    // Or stop them manually:
-    // stopMotors();
+    movements(false, true, autoSpeed, -autoSpeed, 4000, true);
+    //chassis.moveToPoint(30,-40, 4000, {.forwards = true,.maxSpeed = 40});
 }
 
 // DRIVER CONTROL
@@ -326,6 +317,7 @@ void opcontrol() {
             n1.move_velocity(MANUAL_OUTTAKE_SPEED);
             n2.move_velocity(MANUAL_OUTTAKE_SPEED);
             n3.move_velocity(MANUAL_OUTTAKE_SPEED);
+            //
         }
         else if (r2) {
             // Manual Outtake via Button
