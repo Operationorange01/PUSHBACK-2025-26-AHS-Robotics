@@ -1,417 +1,452 @@
 #include "main.h"
 #include <cmath>
 #include "lemlib/api.hpp" // IWYU pragma: keep
+#include "lemlib/chassis/chassis.hpp"
+#include "pros/adi.hpp"
+#include "pros/device.hpp"
+#include "pros/misc.h"
+#include "pros/rtos.hpp"
 
-// controller
+// ==============================
+// CONTROLLER
+// ==============================
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
-// motor groups
-pros::MotorGroup leftMotors({-1, -11, -2}, pros::MotorGearset::blue); // left motor group - ports 3 (reversed), 4, 5 (reversed)
-pros::MotorGroup rightMotors({12, 3, 13}, pros::MotorGearset::blue); // right motor group - ports 6, 7, 9 (reversed)
+// ==============================
+// MOTOR GROUPS
+// ==============================
+pros::MotorGroup leftMotors({-18, -19, -20}, pros::MotorGearset::blue);
+pros::MotorGroup rightMotors({11, 12, 13}, pros::MotorGearset::blue);
 
 // intake/outtake motors
-pros::Motor n1(4, pros::MotorGearset::green);
-pros::Motor n2(5, pros::MotorGearset::green);
-pros::Motor n3(-9, pros::MotorGearset::green);
-pros::Motor n4(-7, pros::MotorGearset::green);
+pros::Motor n1(-1, pros::MotorGearset::green);
+pros::Motor n2(-2, pros::MotorGearset::green);
+pros::Motor n3(3, pros::MotorGearset::green);
 
+// pistons
 pros::ADIDigitalOut outtakePiston('B');
-pros::ADIDigitalOut wingPiston('A'); // wing piston ADI port
-pros::ADIDigitalOut tonguePiston('C'); // pick correct port
+pros::ADIDigitalOut wingPiston('A');
+pros::ADIDigitalOut tonguePiston('D');
+pros::ADIDigitalOut doorPiston('C');
 
-// Inertial Sensor on port 10
-pros::Imu imu(19);
+// sensors
+pros::Imu imu(9);
+// horizontalEnc removed
+pros::Rotation verticalEnc(15);
 
 // tracking wheels
-// horizontal tracking wheel encoder. Rotation sensor, port 20, not reversed
-pros::Rotation horizontalEnc(10);
-// vertical tracking wheel encoder. Rotation sensor, port 11, reversed
-pros::Rotation verticalEnc(20);
-// horizontal tracking wheel. 2.75" diameter, 5.75" offset, back of the robot (negative)
-lemlib::TrackingWheel horizontal(&horizontalEnc, lemlib::Omniwheel::NEW_275, -5.75);
-// vertical tracking wheel. 2.75" diameter, 2.5" offset, left of the robot (negative)
-lemlib::TrackingWheel vertical(&verticalEnc, lemlib::Omniwheel::NEW_275, -2.5);
+// horizontal tracking wheel removed
+lemlib::TrackingWheel vertical(&verticalEnc, 2.0, 0);
 
-// drivetrain settings
-lemlib::Drivetrain drivetrain(&leftMotors, // left motor group
-&rightMotors, // right motor group
-13, // 13 inch track width
-lemlib::Omniwheel::NEW_325, // using new 3.25" omnis
-450, // drivetrain rpm is 360
-4 // horizontal drift is 4.
+// ==============================
+// DRIVETRAIN
+// ==============================
+lemlib::Drivetrain drivetrain(
+    &leftMotors,
+    &rightMotors,
+    12,
+    3.25, 
+    450,
+    2 
 );
 
-// lateral motion controller
-lemlib::ControllerSettings linearController(10, // proportional gain (kP) -- how hard it drives
-0, // integral gain (kI) -- ignore for now
-3, // derivative gain (kD) -- how fast it stops
-3, // anti windup
-1, // small error range, in inches
-100, // small error range timeout, in milliseconds
-3, // large error range, in inches
-500, // large error range timeout, in milliseconds
-20 // maximum acceleration (slew)
+// controllers
+lemlib::ControllerSettings lateral_controller(17, // proportional gain (kP)
+                                              0, // integral gain (kI)
+                                              75, // derivative gain (kD)
+                                              0, // anti windup
+                                              0, // small error range, in inches
+                                              0, // small error range timeout, in milliseconds
+                                              0, // large error range, in inches
+                                              0, // large error range timeout, in milliseconds
+                                              0 // maximum acceleration (slew)
 );
 
-// angular motion controller
-lemlib::ControllerSettings angularController(2, // proportional gain (kP) -- how hard it turns
-0, // integral gain (kI) -- ignore for now
-10, // derivative gain (kD) -- how fast it stops
-3, // anti windup
-1, // small error range, in degrees
-100, // small error range timeout, in milliseconds
-3, // large error range, in degrees
-500, // large error range timeout, in milliseconds
-0 // maximum acceleration (slew)
+lemlib::ControllerSettings angular_controller(6, // proportional gain (kP)
+                                              1, // integral gain (kI)
+                                              67, // derivative gain (kD)
+                                              2.342, // anti windup
+                                              1, // small error range, in inches
+                                              100, // small error range timeout, in milliseconds
+                                              3, // large error range, in inches
+                                              500, // large error range timeout, in milliseconds
+                                              0 // maximum acceleration (slew));
 );
 
-// sensors for odometry
-lemlib::OdomSensors sensors(&vertical, // vertical tracking wheel
-nullptr, // vertical tracking wheel 2, set to nullptr as we don't have a second one
-&horizontal, // horizontal tracking wheel
-nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
-&imu // inertial sensor
+lemlib::OdomSensors sensors(
+    &vertical, // Slot 1: Vertical tracking wheel (YOUR WHEEL GOES HERE)
+    nullptr,   // Slot 2: Second vertical wheel
+    nullptr,   // Slot 3: Horizontal tracking wheel (THIS MUST BE NULL)
+    nullptr,   // Slot 4: Second horizontal wheel
+    &imu       // Slot 5: Inertial sensor
 );
 
-// input curve for throttle input during driver control
-lemlib::ExpoDriveCurve throttleCurve(3, //joystick deadband out of 127.
-10, // minimum output where drivetrain will move out of 127
-1.019 // expo curve gain
+// drive curves
+lemlib::ExpoDriveCurve throttleCurve(3, 10, 1.019);
+lemlib::ExpoDriveCurve steerCurve(5, 5, 1);
+
+// chassis
+lemlib::Chassis chassis(
+    drivetrain,
+    lateral_controller,
+    angular_controller,
+    sensors,
+    &throttleCurve,
+    &steerCurve
 );
 
-// input curve for steer input during driver control
-lemlib::ExpoDriveCurve steerCurve(3, //the deadband now is 6. any movement lower than 6 will be ignored.
-10, // minimum output where drivetrain will move out of 127
-5 // expo curve gain
-);
+// ==============================
+// AUTON HELPERS
+// ==============================
 
-// create the chassis
-lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
-
-//------------------------
-// OUR AUTONOMOUS MENU SETUP
-//------------------------
-int selectedAuton = 0; // we're gonna store which auton we pick here
-std::string autonNames[] = {"Left", "Right", "Middle"}; // names for each auton, so we can display them
-constexpr int NUM_AUTONS = 3; // total number of autonomous routines
-
-// define our three basic autonomous routines
-ASSET(path11_txt); // '.' replaced with "_" to make c++ happy
-ASSET(path12_txt);
-ASSET(path13_txt);
-ASSET(path14_txt);
-ASSET(path15_txt);
-ASSET(path16_txt);
-ASSET(path21_txt); // '.' replaced with "_" to make c++ happy
-ASSET(path22_txt);
-ASSET(path23_txt);
-ASSET(path24_txt);
-ASSET(path25_txt);
-ASSET(path26_txt);
-
-// function to make it easier
-void autonTongueAndFullMotor(bool tong, int speed1, int speed2, int speed3, int speed4){
-    tonguePiston.set_value(tong);
-    n1.move_velocity(speed1);
-    n2.move_velocity(speed2);
-    n3.move_velocity(speed3);
-    n4.move_velocity(speed4);
+// function for motor movements and tongue mech.
+void movements(bool tongue, bool door, int motor1, int motor2and3){          // REVIEW LOGIC FOR THIS FUNCTION!!!!!!!
+    tonguePiston.set_value(tongue);
+    doorPiston.set_value(door);
+    n1.move_velocity(motor1);
+    n2.move_velocity(motor2and3);
+    n3.move_velocity(motor2and3);
 }
 
-// define our three basic autonomous routines
-void autonLeft() {
-    // chassis.follow(path11_txt, 15, 3000, true);
-    chassis.waitUntilDone(); // wait for path to finish
-
-    //do intake/outtake action here
-    chassis.follow(path11_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path12_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path13_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path14_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path15_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path16_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 100, 100, 100, 100);
-
+// use when tuning the PID
+void test(){
+    // set position to x:0, y:0, heading:0
+    chassis.setPose(0, 0, 0);
+    // turn to face heading 90 with a very long timeout
+    chassis.turnToHeading(90, 100000);
 }
 
-void autonRight() {
-    // chassis.follow(path21_txt, 15, 3000, true);
-    chassis.waitUntilDone(); // wait for path to finish
-
-    //do intake/outtake action here
-    chassis.follow(path21_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path22_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path23_txt, 15, 4000, true);
-    autonTongueAndFullMotor(true, -100, -100, -100, 0);
-    chassis.follow(path24_txt, 15, 4000, true);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path25_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 0, 0, 0, 0);
-    chassis.follow(path26_txt, 15, 4000, false);
-    autonTongueAndFullMotor(false, 100, 100, 100, 100);
-
+// Shake Tongue Mech for Skills
+void shakeTongueMechSkills(int x,int y, int goal){
+    for(int i = 0; i < 3; i++) {
+        chassis.moveToPose(x*60, y*47, goal, 500);
+        pros::delay(500);
+    }
 }
 
-
-void autonMiddle() {
-// middle routine, kinda whatever we want
-chassis.moveToPose(12, 12, 45, 3000);
+// Shake Tongue Mech according to position
+void shakeTongueMechPos(int x,int y, int goal){
+    for(int i = 0; i < 3; i++) {
+        chassis.moveToPose(x, y, goal, 500);
+        pros::delay(500);
+    }
 }
 
-// single-button menu for the brain
-void selectAutonMenu() {
-pros::lcd::initialize();
-pros::lcd::set_text(1, "Select Autonomous:");
-pros::lcd::set_text(4, "CENTER = confirm");
+// Decide which goal is being emptied, assign according values, and then empty the goal
+void outtakeAndGoal(int corner, int autonMotorSpeedS, float autonMoveSpeedS){
+    int x,y,face,goal;
+    if(corner == 0){
+        x = -1;
+        y = -1;
+        face = 180;
+        goal = 270;
+    } else if(corner == 1){
+        x = -1;
+        y = 1;
+        face = 0;
+        goal = 270;
+    } else if(corner == 2){
+        x = 1;
+        y = 1;
+        face = 40;
+        goal = 90;
+    } else if(corner == 3){
+        x = 1;
+        y = -1;
+        face = 180;
+        goal = 90;    
+    }
+    
+    // 1. Line up with the goal 
+    chassis.moveToPose(x*44, y*47, face, 6000, {.forwards = false, .maxSpeed = autonMoveSpeedS});
+    movements(false, true, autonMotorSpeedS, -autonMotorSpeedS);
+    
+    // 2. Go to the goal
+    chassis.moveToPose(x*57, y*47, goal, 6000, {.forwards = false, .maxSpeed = autonMoveSpeedS});
+    shakeTongueMechSkills(x,y,goal);
 
-pros::lcd::set_text(2, autonNames[selectedAuton]);
-
-bool confirmed = false;
-bool leftPrev = false, rightPrev = false, centerPrev = false;
-
-while (!confirmed) {
-uint32_t buttons = pros::lcd::read_buttons();
-bool left = buttons & LCD_BTN_LEFT;
-bool right = buttons & LCD_BTN_RIGHT;
-bool center = buttons & LCD_BTN_CENTER;
-
-// Cycle left
-if (left && !leftPrev) {
-selectedAuton--;
-if (selectedAuton < 0) selectedAuton = NUM_AUTONS - 1;
-pros::lcd::set_text(2, autonNames[selectedAuton]);
+    // 3. Leave the goal
+    chassis.moveToPose(x*44, y*47, goal, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+    movements(true, true, 0, 0);
 }
 
-// Cycle right
-if (right && !rightPrev) {
-selectedAuton++;
-if (selectedAuton >= NUM_AUTONS) selectedAuton = 0;
-pros::lcd::set_text(2, autonNames[selectedAuton]);
+// ==============================
+// AUTON PATHS
+// ==============================
+
+// use when testing the auton path. Test one section before adding the next section
+void leftAuton(){
+    chassis.setPose(-56,-16.75,90);
+    float autonMotorSpeedL = 100;
+    float autonMoveSpeedL = 100;
+    movements(false, true, 0, 0); // set everything to default (motors off, tongue mech up)
+
+    // Go to center blocks and start intake
+    chassis.moveToPose(-35, -22.5, 90, +2000, {.forwards = true, .maxSpeed = autonMoveSpeedL});
+    //movements(true, true, autonMotorSpeedL, 0);
+
+    // Turn to 90 degrees
+    chassis.turnToHeading(75, 1000);
+
+    // Move over the middle blocks
+    chassis.moveToPoint(-15, -22.5, 3000, {.forwards = true, .maxSpeed = autonMoveSpeedL});
+    //pros::delay(1000); //wait for intake to be done
+    //(true, 0, 0);
+
+    chassis.moveToPoint(4, 6, 1000);
+    // Turn to 310 degrees
+    chassis.turnToHeading(310, 1000);
+
+    // Line up to the match loader
+    chassis.moveToPoint(-46, -47, 5000, {    .forwards = true, .maxSpeed = autonMoveSpeedL});
+    //movements(false, true, autonMotorSpeedL, 0);
+
+    // Turn to 270 degrees
+    chassis.turnToHeading(270, 1000);
+
+    // Move to the match loader and intake blocks
+    chassis.moveToPoint(-56, -47, 5000, {.forwards = true, .maxSpeed = autonMoveSpeedL});
+    //shakeTongueMechPos(-72, 47, 270);
+    //movements(true, true, 0, 0);
+
+    // Move to the side goals and dispense
+    chassis.moveToPoint(-33, -47, 5000, {.forwards = false, .maxSpeed = autonMoveSpeedL});
+    //movements(true, true, autonMotorSpeedL, -autonMotorSpeedL);
+}   
+
+void skillsAuton(){
+    //start -61,-16, 90
+    float autonMotorSpeedS = 50;
+    float autonMoveSpeedS = 80;
+    movements(true, true, 0, 0);
+                
+    // 1. Get away from the parking zone
+    chassis.moveToPose(-44, -16, 90, 2000, {.forwards = false, .maxSpeed = autonMoveSpeedS});
+
+    // 2. Empty the bottom left goal
+    outtakeAndGoal(0, autonMotorSpeedS, -autonMoveSpeedS);
+
+    /*
+    // 3. Empty the top left goal
+    outtakeAndGoal(1, autonMotorSpeedS, autonMoveSpeedS);
+
+    // 4. Go to the center
+    chassis.moveToPose(-25, 25, 140, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+    chassis.moveToPose(25, 25, 90, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+
+    // 5. Empty the top right goal
+    outtakeAndGoal(2, autonMotorSpeedS, autonMoveSpeedS);
+
+    // 6. Empty the bottom right goal
+    outtakeAndGoal(3, autonMotorSpeedS, autonMoveSpeedS);
+
+    // 7. Go to the center
+    chassis.moveToPose(25, -25, 320, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+    chassis.moveToPose(-25, -25, 270, 6000, {.forwards = true, .maxSpeed = autonMoveSpeedS});
+
+    // 8. Line up with the parking spot
+    chassis.moveToPose(-66, 3, 310, 6000, {.forwards = true, .maxSpeed = 127});
+    */ 
 }
 
-// Confirm selection
-if (center && !centerPrev) {
-confirmed = true;
-}
-
-leftPrev = left;
-rightPrev = right;
-centerPrev = center;
-
-pros::delay(20);
-}
-}
-
-//------------------------
-// END AUTON MENU SETUP
-//------------------------
-
-/**
-* Runs initialization code. This occurs as soon as the program is started.
-*
-* All other competition modes are blocked by initialize; it is recommended
-* to keep execution time for this mode under a few seconds.
-*/
 void initialize() {
-pros::lcd::initialize(); // initialize brain screen
-chassis.calibrate(); // calibrate sensors
+    pros::lcd::initialize();
+    
+    // 1. Physically zero out the rotation sensor hardware
+    verticalEnc.reset_position(); 
+    
+    // 2. Calibrate the IMU
+    chassis.calibrate();
+    
+    // 3. Set the starting position to 0,0,0
+    // Without this, LemLib might interpret the first "degree" as a massive jump
+    chassis.setPose(0,0, 0); 
 
-// the default rate is 50. however, if you need to change the rate, you
-// can do the following.
-// lemlib::bufferedStdout().setRate(...);
-// If you use bluetooth or a wired connection, you will want to have a rate of 10ms
+    tonguePiston.set_value(true); 
 
-// for more information on how the formatting for the loggers
-// works, refer to the fmtlib docs
-
-// thread to for brain screen and position logging
-pros::Task screenTask([&]() {
-while (true) {
-// print robot location to the brain screen
-pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-// log position telemetry
-lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
-// delay to save resources
-pros::delay(50);
+    pros::Task screenTask([&]() {
+        while (true) {
+            lemlib::Pose pose = chassis.getPose();
+            pros::lcd::print(0, "X: %.2f", pose.x);
+            pros::lcd::print(1, "Y: %.2f", pose.y);
+            pros::lcd::print(2, "Theta: %.2f", pose.theta);
+            
+            // This line helps you debug: 
+            // If you push the bot 1 foot, this number should be roughly 18,000 to 20,000
+            pros::lcd::print(3, "Raw Ticks: %d", verticalEnc.get_position());
+            
+            pros::delay(50);
+        }
+    });
 }
-});
 
-// run our auton menu here, before match starts
-selectAutonMenu(); // we pick our autonomous routine here
-}
-
-/**
-* Runs while the robot is disabled
-*/
 void disabled() {}
+void competition_initialize() {
+    tonguePiston.set_value(true); // Tongue Up
+}
 
-/**
-* runs after initialize if the robot is connected to field control
-*/
-void competition_initialize() {}
-
-// get paths for pure pursuit
-// this needs to be put outside a function
-
-
-/**
-* Runs during auto
-*
-* This is an example autonomous routine which demonstrates a lot of the features LemLib has to offer
-*/
+// ==============================
+// AUTONOMOUS
+// ==============================
 void autonomous() {
-    chassis.turnToHeading(90.0, 10000);
+    // Start values and speed
+    int autoSpeed = 400;
+    movements(false, true, 0, 0);
 
-// ---- TEMP PID TEST ----
-// move forward 24 inches   
-/*
-chassis.moveToPose(24, 0, 0, 3000);
-chassis.waitUntilDone();
-pros::delay(1000); // pause
+    // Move to in front of the balls
+    chassis.moveToPose(4, -28, -9, 2000, {.forwards = false});
+    movements(false, true, autoSpeed, 0);
 
-// move back to start
-chassis.moveToPose(0, 0, 0, 3000);
-chassis.waitUntilDone();
-pros::delay(1000);
-// ---- END TEMP PID TEST ----
+    // Move over the balls and turn
+    
+    movements(false, true, 0, 0);
+    chassis.moveToPoint(7,-45, 2000, {.forwards = false, .maxSpeed = 80});
+    chassis.turnToHeading(145+90,1000);
+
+    // Line up with the loader and turn towards it
+    chassis.moveToPoint(30,-22, 2000, {.forwards = false});
+    chassis.turnToHeading(180, 1000);
+
+    // Go to the loader after being lined up and take blocks
+    movements(true, true, autoSpeed, 0);
+    chassis.moveToPoint(32,10, 2000, {.forwards = false});
+    movements(true, true, 0, 0);
+    // shake time
+    // Go backward to the goal
+    chassis.moveToPoint(32,-35.5, 2000, {.forwards = true,.maxSpeed = 80});
+    movements(false, true, autoSpeed, -autoSpeed);
+}
+
+
+/* Old code
+// Move to in front of the balls
+    chassis.moveToPose(4, -28, -9, 2000, {.forwards = false});// change
+    movements(false, 100, 0);
+
+    // Move over the balls and turn 
+    movements(false, 100, 0);
+    chassis.moveToPoint(7,-45, 2000, {.forwards = false});// change
+    chassis.turnToHeading(145,1000);// change
+
+    // Line up with the loader and turn towards it
+    chassis.moveToPoint(30,-22, 2000, {.forwards = false});// change
+    chassis.turnToHeading(180,1000);
+
+    // Go to the loader after being lined up and take blocks
+    movements(true, 0, 0);
+    pros::delay(1000);
+    movements(true, 100, 0);
+
+    chassis.moveToPoint(32,0, 750, {.forwards = false});// change to forward of the loader
+    chassis.moveToPoint(32,-10.5, 2000, {.forwards = false});
+    // shake time
+    // Go backward to the goal
+    chassis.moveToPoint(32,-35.5, 2000, {.forwards = true});
+    movements(false, 100, -100);
 */
-}
+
+/* Super Old code (works)
+chassis.moveToPoint(0,-20.5, 2000, {.forwards = false});
+    chassis.turnToHeading(270,1000);
+    chassis.moveToPoint(32,-20.5, 2000, {.forwards = false});
+    chassis.turnToHeading(180,1000);
+    chassis.moveToPoint(32,-10.5, 2000, {.forwards = false});
+    // shake time
+    chassis.moveToPoint(32,-35.5, 2000, {.forwards = true});
+*/
 
 // ==============================
-// DRIVER CONTROL FUNCTIONS
+// DRIVER CONTROL
 // ==============================
-
 double expo(int input, double k) {
-double x = input / 127.0;
-return (k * x * x * x + (1.0 - k) * x) * 127.0;
+    double x = input / 127.0;
+    return (k * x * x * x + (1.0 - k) * x) * 127.0;
 }
-                                                                                                                                                                                                                                                                                         
+
 void opcontrol() {
-// ==============================
-    // DRIVER CONTROL LOOP
-    // CONSTANTS
-// ==============================
-constexpr int INTAKEJOY_DEADZONE = 15;
-constexpr double INTAKE_EXPO_K = 0.6;
-constexpr int MAX_INTAKE_RPM = 200;
+    // Constants
+    constexpr int INTAKEJOY_DEADZONE = 15;
+    constexpr double INTAKE_EXPO_K = 0.6;
+    constexpr int MAX_INTAKE_RPM = 200;
+    constexpr int MANUAL_OUTTAKE_SPEED = 200;
 
-    // ==============================
-    // STATE TRACKING
-    // ==============================
-    bool outtakeDown = false;   // false = up, true = down
-    bool tongueOut = false;
+    // Toggle states
+    bool outtakeDown = false;
+    bool tongueState = false; // false = Up (default), true = Down
 
-    bool r1Prev = false;
+    // Previous button states
     bool r2Prev = false;
     bool l2Prev = false;
 
-while (true) {
-// ------------------------------
-// DRIVE CONTROL
-// ------------------------------
-int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
-chassis.arcade(leftY, leftX);
+    while (true) {
+        // ===== 1. DRIVE CONTROL =====
+        int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+        int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
+        
+        // Using expo on leftX to make turning less sensitive
+        chassis.arcade(leftY, expo(leftX, 0.45));
 
-// ------------------------------
-        // INTAKE/OUTTAKE CONTROL
-        // READ BUTTONS
-        // ------------------------------
+        // ===== 2. INPUT DATA =====
         bool r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
-        bool l2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
         bool l1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
+        bool l2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
+        int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
 
-        // ------------------------------
-        // OUTTAKE PISTON TOGGLE (R1 / R2)
-        // ------------------------------
-        bool outtakeTogglePressed =
-            (r1 && !r1Prev) ||
-            (r2 && !r2Prev);
+        // This variable now only depends on the R1 button
+        bool isOuttaking = r1;
 
-        if (outtakeTogglePressed) {
+        // ===== 3. INTAKE / OUTTAKE MOTOR LOGIC =====
+        if (r1) {
+            // Manual Outtake via Button
+            n1.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n2.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n3.move_velocity(MANUAL_OUTTAKE_SPEED);
+            //
+        }
+        else if (r2) {
+            // Manual Outtake via Button
+            n1.move_velocity(MANUAL_OUTTAKE_SPEED);
+            n2.move_velocity(-MANUAL_OUTTAKE_SPEED);
+            n3.move_velocity(-MANUAL_OUTTAKE_SPEED);
+        } 
+        else if (std::abs(rightY) > INTAKEJOY_DEADZONE) {
+            // Intake/Outtake via Joystick (Does NOT open the door)
+            int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
+            int rpm = (speed * MAX_INTAKE_RPM) / 127;
+
+            n1.move_velocity(rpm);
+            n2.move_velocity(rpm);
+            n2.move_velocity(0);
+        } 
+        else {
+            n1.move_velocity(0);
+            n2.move_velocity(0);
+            n3.move_velocity(0);
+        }
+
+        // ===== 4. PISTON CONTROL =====
+        
+        doorPiston.set_value(!isOuttaking);
+
+        // TONGUE: Toggle logic
+        if (l2 && !l2Prev) {
+            tongueState = !tongueState;
+        }
+        l2Prev = l2;
+        // Adjust this '!' if the tongue is starting in the wrong position too
+        tonguePiston.set_value(!tongueState); 
+
+        // WINGS
+        wingPiston.set_value(!l1);
+
+        // OUTTAKE PISTON: Toggle logic
+        if (r2 && !r2Prev) {
             outtakeDown = !outtakeDown;
             outtakePiston.set_value(outtakeDown);
         }
-
-        r1Prev = r1;
         r2Prev = r2;
 
-        // ------------------------------
-        // TONGUE TOGGLE (L2)
-        // ------------------------------
-        if (l2 && !l2Prev) {
-            tongueOut = !tongueOut;
-            tonguePiston.set_value(tongueOut);
-        }
-        l2Prev = l2;
-
-        // ------------------------------
-        // INTAKE / OUTTAKE MOTORS
-// ------------------------------
-int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
-        r1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1); // Top outtake
-        r2 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2); // Middle outtake
-
-        if (r1) {
-        // ---- TOP OUTTAKE ----
-                    outtakePiston.set_value(false); // piston down
-        n1.move_velocity(200);
-        n2.move_velocity(200);
-        n3.move_velocity(200);
-                    n4.move_velocity(200); // n4 only runs for top outtake
-                    n4.move_velocity(200);
-        }
-        else if (r2) {
-        // ---- MIDDLE OUTTAKE ----
-                    outtakePiston.set_value(true); // piston up
-        n1.move_velocity(200);
-        n2.move_velocity(200);
-        n3.move_velocity(200);
-                    n4.move_velocity(0); // n4 stays off
-                    n4.move_velocity(0);
-        }
-        else if (abs(rightY) > INTAKEJOY_DEADZONE) {
-        // ---- JOYSTICK INTAKE ----
-        int speed = static_cast<int>(expo(rightY, INTAKE_EXPO_K));
-        int speedRPM = (speed * MAX_INTAKE_RPM) / 127;
-                    outtakePiston.set_value(false); // piston down
-
-        n1.move_velocity(speedRPM);
-        n2.move_velocity(speedRPM);
-        n3.move_velocity(speedRPM);
-                    n4.move_velocity(0); // n4 stays off
-                    n4.move_velocity(0);
-        }
-        else {
-                    // ---- STOP ALL INTAKE MOTORS ----
-                    outtakePiston.set_value(false); // piston down
-                    // ---- STOP INTAKE ----
-        n1.move_velocity(0);
-        n2.move_velocity(0);
-        n3.move_velocity(0);
-                    n4.move_velocity(0); // n4 stays off
-                    n4.move_velocity(0);
-        }
-
-        // ------------------------------
-                // WING CONTROL (Hold L1)
-                // WING CONTROL (HOLD L1)
-        // ------------------------------
-                l1 = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
-                wingPiston.set_value(!l1); // false when held (lower wing), true when released (raise wing)
-                wingPiston.set_value(!l1);
-
-                pros::delay(10); // small delay to prevent CPU overload
-                pros::delay(10);
-        }
+        pros::delay(10);
+    }
 }
