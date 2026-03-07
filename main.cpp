@@ -61,7 +61,7 @@ lemlib::ControllerSettings lateral_controller(17, // proportional gain (kP)
 );
 
 lemlib::ControllerSettings angular_controller(6, // proportional gain (kP)
-                                              1, // integral gain (kI)
+                                              0, // integral gain (kI)
                                               67, // derivative gain (kD)
                                               2.342, // anti windup
                                               1, // small error range, in inches
@@ -120,13 +120,13 @@ void movements(bool tongue, bool door, int motor1, int motor2and3, int duration_
                     unsigned long elapsed = pros::millis() - lastUnjamTime;
                     
                     // Run forward for 3 seconds
-                    if (elapsed < 3000) {
+                    if (elapsed < 2000) {
                         n1.move(motor1);
                         n2.move(motor2and3);
                         n3.move(motor2and3);
                     }
                     // Run backward for 0.5 seconds
-                    else if (elapsed < 3500) {
+                    else if (elapsed < 2250) {
                         n1.move(-motor1);
                         n2.move(-motor2and3);
                         n3.move(-motor2and3);
@@ -185,7 +185,7 @@ void shakeTongueMech(int cycles) {
         pros::delay(100); 
         leftMotors.move(0);
         rightMotors.move(0);
-        pros::delay(200);
+        pros::delay(300);
 
         
     }
@@ -215,7 +215,7 @@ void initialize() {
     // Without this, LemLib might interpret the first "degree" as a massive jump
     chassis.setPose(0,0, 0); 
 
-    tonguePiston.set_value(true); 
+    tonguePiston.set_value(false);
 
     pros::Task screenTask([&]() {
         while (true) {
@@ -242,30 +242,70 @@ void competition_initialize() {
 // AUTONOMOUS
 // ==============================
 
-void autonomous() {
+void leftAuton() {
     // Start values and speed
     int autoSpeed = 400;
     movements(false, true, 0, 0, 0, false);
 
     // Move to in front of the balls
-    chassis.moveToPose(4, -28, -9, 2000, {.forwards = false});
-    movements(false, true, autoSpeed, 0, 2500, false);
+    chassis.moveToPose(4, -28, -9, 1000, {.forwards = false});
+    movements(false, true, autoSpeed, 0, 4000, false);
 
-    chassis.moveToPoint(7,-45, 2000, {.forwards = false, .maxSpeed = 80});
-    chassis.turnToHeading(145+90,1000);
+    chassis.moveToPoint(7,-45, 750, {.forwards = false, .maxSpeed = 100});
+    chassis.turnToHeading(235,500);
 
     // Line up with the loader and turn towards it
-    chassis.moveToPoint(30,-22, 2000, {.forwards = false});
-    chassis.turnToHeading(180, 1000);
+    chassis.moveToPoint(32,-22, 1000, {.forwards = false,.maxSpeed = 80});
+    chassis.turnToHeading(180, 750);
 
     // Go to the loader after being lined up and take blocks
     movements(true, true, autoSpeed, 0, 5000, false);
-    chassis.moveToPoint(32,-10.5, 2000, {.forwards = false});
-    shakeTongueMech(4);
+    chassis.moveToPoint(32,-7.5, 1500, {.forwards = false,.maxSpeed = 60});
+    chassis.waitUntilDone();
+    shakeTongueMech(6);
+    chassis.waitUntilDone();
 
-    chassis.moveToPoint(32,-35.5, 2000, {.forwards = true,.maxSpeed = 80});
+
+
+    chassis.moveToPoint(32,-36.5, 1000, {.forwards = true,.maxSpeed = 80});
     chassis.waitUntilDone();
     movements(false, true, autoSpeed, -autoSpeed, 4000, true);
+    //chassis.moveToPoint(30,-40, 4000, {.forwards = true,.maxSpeed = 40});
+}
+
+void rightAuton() {
+    // Start values and speed
+    int autoSpeed = 400;
+    movements(false, true, 0, 0, 0, false);
+
+    // Move to in front of the balls
+    chassis.moveToPose(-4, -28, 9, 1000, {.forwards = false});
+    movements(false, true, autoSpeed, 0, 4000, false);
+
+    chassis.moveToPoint(-7,-45, 750, {.forwards = false, .maxSpeed = 100});
+    chassis.turnToHeading(235-90,500);
+
+    // Line up with the loader and turn towards it
+    chassis.moveToPoint(-32,-22, 1000, {.forwards = false,.maxSpeed = 80});
+    chassis.turnToHeading(180, 750);
+
+    // Go to the loader after being lined up and take blocks
+    movements(true, true, autoSpeed, 0, 5000, false);
+    chassis.moveToPoint(-32,-7.5, 1500, {.forwards = false,.maxSpeed = 60});
+    chassis.waitUntilDone();
+    shakeTongueMech(6);
+    chassis.waitUntilDone();
+
+
+
+    chassis.moveToPoint(-32,-36.5, 1000, {.forwards = true,.maxSpeed = 80});
+    chassis.waitUntilDone();
+    movements(false, true, autoSpeed, -autoSpeed, 4000, true);
+    //chassis.moveToPoint(30,-40, 4000, {.forwards = true,.maxSpeed = 40});
+}
+
+void autonomous() {
+    leftAuton();
 }
 
 // DRIVER CONTROL
